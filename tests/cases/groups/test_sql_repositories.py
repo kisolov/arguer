@@ -3,7 +3,9 @@ from types import SimpleNamespace
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
 
+from src.application import EnsureUserExists
 from src.domain.exceptions import RecordNotFound
 from src.domain.models import (
     Transaction,
@@ -12,6 +14,7 @@ from src.domain.models import (
     User,
 )
 from src.infrastructure.db import Database, SqlTransactionRepository, SqlUserRepository
+from src.infrastructure.db import models
 from tests.cases.base import BaseTestGroup
 
 
@@ -118,6 +121,26 @@ class TestSqlUserRepository(BaseTestGroup):
 
         assert sorted(u.telegram_id for u in stored) == list(range(1000, 1005))
         assert len({u.id for u in stored}) == 5
+
+
+    @pytest.mark.asyncio
+    async def test_simultaneous_first_updates_register_one_user(self, tmp_path):
+        # Пачка пересылок от нового пользователя обрабатывается параллельно.
+        db = Database.from_config(
+            SimpleNamespace(provider="sqlite", filename=str(tmp_path / "burst.db"))
+        )
+        await db.create_schema()
+        users = SqlUserRepository(db)
+
+        registered = await asyncio.gather(
+            *(EnsureUserExists(users, telegram_id=555).execute() for _ in range(5))
+        )
+        async with db.sessions() as session:
+            rows = (await session.scalars(select(models.User))).all()
+        await db.dispose()
+
+        assert len({u.id for u in registered}) == 1
+        assert len(rows) == 1
 
 
 class TestSqlTransactionRepository(BaseTestGroup):

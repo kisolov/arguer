@@ -1,3 +1,5 @@
+import asyncio
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,9 +9,20 @@ from src.domain.ports.repositories import UserRepository
 from .base import SqlRepositoryAdapter
 from .mapper import SqlDomainMapper
 from .. import models
+from ..setup import Database
 
 
 class SqlUserRepository(SqlRepositoryAdapter[User, models.User], UserRepository):
+    def __init__(self, database: Database):
+        super().__init__(database)
+        # Пачка апдейтов от нового пользователя идёт параллельно: без замка
+        # get-or-create создаст нескольких пользователей с одним telegram_id.
+        self._store_lock = asyncio.Lock()
+
+    async def store(self, domain_user: User) -> User:
+        async with self._store_lock:
+            return await super().store(domain_user)
+
     def _map(self, db_user: models.User) -> User:
         return SqlDomainMapper().user_to_domain(db_user)
 
