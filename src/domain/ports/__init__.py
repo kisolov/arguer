@@ -7,3 +7,4 @@ from .message_service import MessageService, Texts
 from .context_service import ContextService
 from .payment_gateway import PaymentGateway, PaymentInfo
 from .popup_service import PopupService
+from .unit_of_work import UnitOfWork

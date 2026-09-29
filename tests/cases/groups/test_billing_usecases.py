@@ -52,7 +52,7 @@ class TestChargeForUsage(BillingTestGroup):
 
     @pytest.mark.asyncio
     async def test_insufficient_funds_does_not_notify(self, session, billing):
-        session.user.bal = 1
+        await self.set_balance(session.user, 1)
         await self.add_messages(session, 2)
         dialogue = await session.context_service.get_unprocessed()
 

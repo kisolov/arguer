@@ -1,4 +1,6 @@
-from src.domain.exceptions import InsufficientFunds
+from dataclasses import replace
+from typing import Callable
+
 from src.domain.models import (
     TransactionCategory,
     TransactionStatus,
@@ -7,18 +9,19 @@ from src.domain.models import (
     Dialogue,
 )
 from .cost_calculator import CostCalculator
-from src.domain.ports.repositories import TransactionRepository, UserRepository
+from src.domain.ports import UnitOfWork
+from src.domain.ports.repositories import TransactionRepository
 
 
 class BillingService:
     def __init__(
         self,
         transaction_repository: TransactionRepository,
-        user_repository: UserRepository,
+        unit_of_work: Callable[[], UnitOfWork],
         cost_calculator: CostCalculator,
     ):
         self.transaction_repository = transaction_repository
-        self.user_repository = user_repository
+        self.unit_of_work = unit_of_work
         self.cost_calculator = cost_calculator
 
     def calculate_dialogue_cost(self, dialogue: Dialogue):
@@ -56,14 +59,54 @@ class BillingService:
         )
 
     async def apply_transaction(self, transaction: Transaction):
-        if transaction.user.bal + transaction.amount < 0:
-            raise InsufficientFunds()
-        transaction.status = TransactionStatus.COMPLETED
-        transaction.user.bal += transaction.amount
+        """Начисляет или списывает сумму транзакции атомарно.
 
-        await self.transaction_repository.store(transaction)
-        await self.user_repository.store(transaction.user)
+        Баланс меняется приращением в БД, а не записью снимка из памяти, поэтому
+        параллельные начисления не теряются. Переданные объекты обновляются
+        только после успешного коммита.
+        """
+        if transaction.id is None:
+            await self._apply_new(transaction)
+        else:
+            await self._apply_pending(transaction)
+
+    async def _apply_new(self, transaction: Transaction):
+        completed = replace(transaction, status=TransactionStatus.COMPLETED)
+        async with self.unit_of_work() as uow:
+            user = await uow.users.change_balance(
+                transaction.user.id, transaction.amount
+            )
+            stored = await uow.transactions.store(completed)
+
+        transaction.id = stored.id
+        transaction.status = TransactionStatus.COMPLETED
+        transaction.user.bal = user.bal
+
+    async def _apply_pending(self, transaction: Transaction):
+        async with self.unit_of_work() as uow:
+            applied = await uow.transactions.transition_pending(
+                transaction.id, TransactionStatus.COMPLETED
+            )
+            if applied:
+                user = await uow.users.change_balance(
+                    transaction.user.id, transaction.amount
+                )
+                status = TransactionStatus.COMPLETED
+            else:
+                # Уже обработана параллельным вызовом: баланс не трогаем
+                user = await uow.users.get(transaction.user)
+                status = (await uow.transactions.get(transaction)).status
+
+        transaction.status = status
+        transaction.user.bal = user.bal
 
     async def cancel_transaction(self, transaction: Transaction):
-        transaction.status = TransactionStatus.CANCELED
-        await self.transaction_repository.store(transaction)
+        cancelled = await self.transaction_repository.transition_pending(
+            transaction.id, TransactionStatus.CANCELED
+        )
+        if cancelled:
+            transaction.status = TransactionStatus.CANCELED
+        else:
+            transaction.status = (
+                await self.transaction_repository.get(transaction)
+            ).status

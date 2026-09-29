@@ -1,6 +1,6 @@
 from typing import List
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -50,7 +50,7 @@ class SqlTransactionRepository(
         return db_transaction
 
     async def get_pending_transactions_for(self, user_id: int) -> List[Transaction]:
-        async with self._sessions() as session:
+        async with self._read() as session:
             rows = await session.scalars(
                 select(models.Transaction)
                 .where(
@@ -60,3 +60,19 @@ class SqlTransactionRepository(
                 .options(_WITH_USER)
             )
             return [self._map(t) for t in rows]
+
+    async def transition_pending(
+        self, transaction_id: int, status: TransactionStatus
+    ) -> bool:
+        async with self._write() as session:
+            # Compare-and-set: переход выигрывает ровно один из параллельных вызовов
+            changed = await session.execute(
+                update(models.Transaction)
+                .where(
+                    models.Transaction.id == transaction_id,
+                    models.Transaction.status == TransactionStatus.PENDING,
+                )
+                .values(status=status)
+                .execution_options(synchronize_session=False)
+            )
+            return changed.rowcount == 1

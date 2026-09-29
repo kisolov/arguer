@@ -6,3 +6,4 @@ from .message_service import MockMessageService
 from .popup_service import MockPopupService
 from .repos import InMemoryUserRepository, InMemoryTransactionRepository
 from .speech_recognizer import MockSpeechRecognition
+from .unit_of_work import InMemoryUnitOfWork

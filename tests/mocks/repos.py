@@ -1,5 +1,6 @@
+from copy import deepcopy
 from typing import Dict, TypeVar, Generic, List
-from src.domain.exceptions import RecordNotFound
+from src.domain.exceptions import InsufficientFunds, RecordNotFound
 from src.domain.models import User, Transaction, TransactionStatus
 from src.domain.ports.repositories import (
     DomainRepository,
@@ -11,25 +12,30 @@ DomainEntity = TypeVar("DomainEntity")
 
 
 class InMemoryRepository(DomainRepository[DomainEntity], Generic[DomainEntity]):
-    """Базовый in-memory репозиторий"""
+    """Базовый in-memory репозиторий.
+
+    Как и SQL-адаптер, принимает и отдаёт копии: изменение объекта вызывающим
+    не попадает в хранилище, пока он не вызовет store.
+    """
 
     def __init__(self):
         self._storage: Dict[int, DomainEntity] = {}
         self._next_id = 1
 
     async def store(self, domain_entity: DomainEntity) -> DomainEntity:
-        if domain_entity.id is None:
-            domain_entity.id = self._next_id
-            self._next_id += 1
+        stored = deepcopy(domain_entity)
+        if stored.id is None:
+            stored.id = self._next_id
+        self._next_id = max(self._next_id, stored.id + 1)
 
-        self._storage[domain_entity.id] = domain_entity
-        return domain_entity
+        self._storage[stored.id] = stored
+        return deepcopy(stored)
 
     async def get(self, domain_entity: DomainEntity) -> DomainEntity:
         if domain_entity.id is None or domain_entity.id not in self._storage:
             raise RecordNotFound(domain_entity)
 
-        return self._storage[domain_entity.id]
+        return deepcopy(self._storage[domain_entity.id])
 
 
 class InMemoryUserRepository(InMemoryRepository[User], UserRepository):
@@ -37,14 +43,23 @@ class InMemoryUserRepository(InMemoryRepository[User], UserRepository):
 
     async def get(self, user: User) -> User:
         if user.id and user.id in self._storage:
-            return self._storage[user.id]
+            return deepcopy(self._storage[user.id])
 
         # Поиск по telegram_id
         for stored_user in self._storage.values():
             if stored_user.telegram_id == user.telegram_id:
-                return stored_user
+                return deepcopy(stored_user)
 
         raise RecordNotFound(user)
+
+    async def change_balance(self, user_id: int, delta: float) -> User:
+        stored = self._storage.get(user_id)
+        if stored is None:
+            raise RecordNotFound(f"User[{user_id}]")
+        if stored.bal + delta < 0:
+            raise InsufficientFunds()
+        stored.bal += delta
+        return deepcopy(stored)
 
 
 class InMemoryTransactionRepository(
@@ -54,7 +69,16 @@ class InMemoryTransactionRepository(
 
     async def get_pending_transactions_for(self, user_id: int) -> List[Transaction]:
         return [
-            t
+            deepcopy(t)
             for t in self._storage.values()
             if t.user.id == user_id and t.status == TransactionStatus.PENDING
         ]
+
+    async def transition_pending(
+        self, transaction_id: int, status: TransactionStatus
+    ) -> bool:
+        stored = self._storage.get(transaction_id)
+        if stored is None or stored.status != TransactionStatus.PENDING:
+            return False
+        stored.status = status
+        return True

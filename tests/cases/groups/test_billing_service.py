@@ -87,14 +87,15 @@ class TestBillingService(BaseTestGroup):
 
     @pytest.mark.asyncio
     async def test_apply_transaction_credits_balance_and_completes(
-        self, billing, stored_user, transactions
+        self, billing, users, stored_user, transactions
     ):
         await billing.record_top_up(stored_user, 500, "pay-2")
         pending = (await transactions.get_pending_transactions_for(stored_user.id))[0]
 
         await billing.apply_transaction(pending)
 
-        assert stored_user.bal == 600
+        assert (await users.get(stored_user)).bal == 600
+        assert pending.user.bal == 600
         assert pending.status == TransactionStatus.COMPLETED
         assert await transactions.get_pending_transactions_for(stored_user.id) == []
 

@@ -26,6 +26,7 @@ from src.domain.ports import (
     MediaHandler,
     LanguageModelInterface,
     PaymentGateway,
+    UnitOfWork,
 )
 
 from src.domain.ports.repositories import (
@@ -47,6 +48,7 @@ from src.infrastructure import (
     Database,
     SqlUserRepository,
     SqlTransactionRepository,
+    SqlUnitOfWork,
     YooKassaGateway,
 )
 from src.infrastructure.memory import InMemoryBuyOptionsRepository
@@ -120,6 +122,8 @@ class AdaptersContainer(containers.DeclarativeContainer):
     database = providers.Singleton(Database.from_config, config.db_config)
     sql_user_repo = providers.Singleton(SqlUserRepository, database)
     sql_transaction_repo = providers.Singleton(SqlTransactionRepository, database)
+    # UnitOfWork: новый экземпляр на сценарий (своя сессия и транзакция), поэтому Factory
+    sql_unit_of_work = providers.Factory(SqlUnitOfWork, database)
 
     # Cron
     cron_scheduler = providers.Singleton(CronScheduler)
@@ -145,6 +149,7 @@ class InterfacesContainer(containers.DeclarativeContainer):
     transaction_repository = providers.AbstractSingleton(TransactionRepository)
     buy_options_repository = providers.AbstractSingleton(BuyOptionsRepository)
     payment_gateway = providers.AbstractSingleton(PaymentGateway)
+    unit_of_work = providers.AbstractFactory(UnitOfWork)
 
 
 class CoreContainer(containers.DeclarativeContainer):
@@ -163,7 +168,7 @@ class CoreContainer(containers.DeclarativeContainer):
     billing_service = providers.Singleton(
         BillingService,
         transaction_repository=interfaces.transaction_repository,
-        user_repository=interfaces.user_repository,
+        unit_of_work=interfaces.unit_of_work.provider,
         cost_calculator=cost_calculator,
     )
 
@@ -188,6 +193,7 @@ class Container(containers.DeclarativeContainer):
     interfaces.llm.override(adapters.genapi_client)
     interfaces.user_repository.override(adapters.sql_user_repo)
     interfaces.transaction_repository.override(adapters.sql_transaction_repo)
+    interfaces.unit_of_work.override(adapters.sql_unit_of_work)
     interfaces.buy_options_repository.override(adapters.in_memory_buy_options_repo)
     interfaces.payment_gateway.override(adapters.yookassa_payment_gateway)
     bot = providers.Singleton(

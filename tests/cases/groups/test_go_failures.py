@@ -15,7 +15,7 @@ class TestGoFailures(BaseTestGroup):
 
     @pytest.mark.asyncio
     async def test_insufficient_funds_stops_before_processing(self, session, go_uc):
-        session.user.bal = 1
+        await self.set_balance(session.user, 1)
         await self.add_messages(session, 3)
         await session.context_service.set_defendant(Speaker("человек 0"))
 

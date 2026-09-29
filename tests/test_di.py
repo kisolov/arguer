@@ -6,6 +6,7 @@ from tests.mocks import (
     MockLanguageModel,
     InMemoryUserRepository,
     InMemoryTransactionRepository,
+    InMemoryUnitOfWork,
 )
 from tests.test_config import TestSettings
 
@@ -19,6 +20,9 @@ class TestContainer(Container):
     llm_mock = providers.Singleton(MockLanguageModel)
     user_repo_mock = providers.Singleton(InMemoryUserRepository)
     transaction_repo_mock = providers.Singleton(InMemoryTransactionRepository)
+    uow_mock = providers.Factory(
+        InMemoryUnitOfWork, user_repo_mock, transaction_repo_mock
+    )
 
     # ---- overrides ----
 
@@ -26,6 +30,7 @@ class TestContainer(Container):
     Container.interfaces.llm.override(llm_mock)
     Container.interfaces.user_repository.override(user_repo_mock)
     Container.interfaces.transaction_repository.override(transaction_repo_mock)
+    Container.interfaces.unit_of_work.override(uow_mock)
 
 
 container = TestContainer()

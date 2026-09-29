@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 
 from src.application import Go, Session
 from src.domain.models import User
@@ -22,6 +23,16 @@ class BaseTestGroup:
     @pytest.fixture(scope="function")
     def user(self):
         return User(telegram_id=1, id=1, bal=1000)
+
+    async def set_balance(self, user: User, balance: float):
+        """Баланс живёт в репозитории: снимок в памяти его не определяет."""
+        user.bal = balance
+        await self.container.interfaces.user_repository().store(user)
+
+    @pytest_asyncio.fixture(autouse=True)
+    async def register_session_user(self, container, user):
+        """Пользователь сессии есть в репозитории, как в проде после регистрации."""
+        await container.interfaces.user_repository().store(user)
 
     @pytest.fixture(scope="function")
     def session(self, user):
