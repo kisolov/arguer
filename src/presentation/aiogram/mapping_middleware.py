@@ -33,6 +33,8 @@ class MappingMiddleware(BaseMiddleware):
 
             if event.forward_from:
                 forward_from_name = getattr(event.forward_from, "full_name", "hidden")
+            elif event.forward_sender_name:
+                forward_from_name = event.forward_sender_name
 
         elif isinstance(event, types.CallbackQuery):
             callback_data: CallbackData | None = data.get("callback_data", None)

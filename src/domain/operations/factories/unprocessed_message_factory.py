@@ -13,7 +13,7 @@ class UnprocessedMessageFactory:
         if not media and not text:
             raise ValueError("Media url or text required")
 
-        unprocessed_message = UnprocessedMessage(Speaker(speaker_name))
+        unprocessed_message = UnprocessedMessage(Speaker(speaker_name or "hidden"))
         unprocessed_message.media = media
         unprocessed_message.text = text
 

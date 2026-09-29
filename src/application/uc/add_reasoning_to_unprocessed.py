@@ -23,9 +23,9 @@ class AddMessageToUnprocessed(SessionRelatedUseCase):
     async def _add_to_unprocessed(self, unprocessed_message):
         try:
             dialogue = await self.session.context_service.get_unprocessed()
-            self._validate_addition(dialogue, unprocessed_message)
         except ContextEmpty:
             dialogue = Dialogue()
+        self._validate_addition(dialogue, unprocessed_message)
         dialogue.add_message(unprocessed_message)
         await self.session.context_service.set_unprocessed(dialogue)
 
@@ -38,40 +38,6 @@ class AddMessageToUnprocessed(SessionRelatedUseCase):
         return unprocessed_message
 
     def _validate_addition(self, dialogue: Dialogue, new_message: UnprocessedMessage):
-        if len(dialogue.messages) == self.messages_limit:
-            raise MessagesLimitExceeded(self.messages_limit)
-        if (
-            new_message.media
-            and dialogue.media_duration + new_message.media.duration
-            > self.media_limit_seconds
-        ):
-            raise MediaLimitExceeded(self.media_limit_seconds)
-
-
-class AddTestMessageToUnprocessed(SessionRelatedUseCase):
-    def __init__(self, session: Session, app_config: AppConfig):
-        self.messages_limit = app_config.unprocessed_messages_limit
-        self.media_limit_seconds = app_config.unprocessed_media_duration_limit
-        super().__init__(session)
-
-    async def execute(self, sender_name: str, text_data: str, media=None):
-        unprocessed_message = UnprocessedMessageFactory().create(
-            speaker_name=sender_name,
-            media=media,
-            text=text_data,
-        )
-        await self._add_to_unprocessed(unprocessed_message)
-
-    async def _add_to_unprocessed(self, unprocessed_message):
-        try:
-            dialogue = await self.session.context_service.get_unprocessed()
-            self._validate_addition(dialogue, unprocessed_message)
-        except ContextEmpty:
-            dialogue = Dialogue()
-        dialogue.add_message(unprocessed_message)
-        await self.session.context_service.set_unprocessed(dialogue)
-
-    def _validate_addition(self, dialogue: Dialogue, new_message: UnprocessedMessage):
         if len(dialogue.messages) >= self.messages_limit:
             raise MessagesLimitExceeded(self.messages_limit)
         if (
@@ -80,3 +46,13 @@ class AddTestMessageToUnprocessed(SessionRelatedUseCase):
             > self.media_limit_seconds
         ):
             raise MediaLimitExceeded(self.media_limit_seconds)
+
+
+class AddTestMessageToUnprocessed(AddMessageToUnprocessed):
+    async def execute(self, sender_name: str, text_data: str, media=None):
+        unprocessed_message = UnprocessedMessageFactory().create(
+            speaker_name=sender_name,
+            media=media,
+            text=text_data,
+        )
+        await self._add_to_unprocessed(unprocessed_message)
