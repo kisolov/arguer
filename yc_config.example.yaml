@@ -1,0 +1,20 @@
+# Copy to yc_config.yaml (gitignored) and fill in. The Dockerfile copies it
+# to ~/.config/yandex-cloud/config.yaml so the bot can mint IAM tokens via `yc`.
+current: default
+profiles:
+  default:
+    service-account-key:
+      id: <key id>
+      service_account_id: <service account id>
+      key_algorithm: RSA_2048
+      public_key: |
+        -----BEGIN PUBLIC KEY-----
+        ...
+        -----END PUBLIC KEY-----
+      private_key: |
+        -----BEGIN PRIVATE KEY-----
+        ...
+        -----END PRIVATE KEY-----
+    cloud-id: <cloud id>
+    folder-id: <folder id>
+    compute-default-zone: ru-central1-a
