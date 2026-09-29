@@ -44,9 +44,9 @@ from src.infrastructure import (
     GenAPIClient,
     CronScheduler,
     YCCLIWrapper,
-    setup_pony,
-    PonyUserRepository,
-    PonyTransactionRepository,
+    Database,
+    SqlUserRepository,
+    SqlTransactionRepository,
     YooKassaGateway,
 )
 from src.infrastructure.memory import InMemoryBuyOptionsRepository
@@ -116,10 +116,10 @@ class AdaptersContainer(containers.DeclarativeContainer):
         WebMediaHandler, speech_recognizer=speech_kit
     )
 
-    # Pony ORM
-    pony_user_repo = providers.Singleton(PonyUserRepository)
-    pony_transaction_repo = providers.Singleton(PonyTransactionRepository)
-    init_pony = providers.Callable(lambda c: setup_pony(c.db_config()), config)
+    # SQL (SQLAlchemy)
+    database = providers.Singleton(Database.from_config, config.db_config)
+    sql_user_repo = providers.Singleton(SqlUserRepository, database)
+    sql_transaction_repo = providers.Singleton(SqlTransactionRepository, database)
 
     # Cron
     cron_scheduler = providers.Singleton(CronScheduler)
@@ -186,8 +186,8 @@ class Container(containers.DeclarativeContainer):
     interfaces.key_value_storage.override(adapters.redis_storage)
     interfaces.media_handler.override(adapters.web_media_handler)
     interfaces.llm.override(adapters.genapi_client)
-    interfaces.user_repository.override(adapters.pony_user_repo)
-    interfaces.transaction_repository.override(adapters.pony_transaction_repo)
+    interfaces.user_repository.override(adapters.sql_user_repo)
+    interfaces.transaction_repository.override(adapters.sql_transaction_repo)
     interfaces.buy_options_repository.override(adapters.in_memory_buy_options_repo)
     interfaces.payment_gateway.override(adapters.yookassa_payment_gateway)
     bot = providers.Singleton(

@@ -4,6 +4,6 @@ from .redis import RedisStorage
 from .web import WebMediaHandler
 from .yookassa import YooKassaGateway
 from .yandex import *
-from .pony import *
+from .db import *
 from .aiogram import *
 from .memory import *

@@ -8,7 +8,7 @@ from src.application import RefreshToken
 from src.domain.operations import TokenService
 from src.domain.ports import Scheduler
 from src.domain.ports.repositories import UserRepository
-from src.infrastructure import YCCLIWrapper
+from src.infrastructure import Database, YCCLIWrapper
 from src.presentation.aiogram import (
     RegistrationMiddleware,
     setup_routes,
@@ -38,8 +38,9 @@ async def main(
     yccli_wrapper: YCCLIWrapper = Provide[Container.adapters.yccli_wrapper],
     token_service: TokenService = Provide[Container.adapters.yandex_iam_repository],
     user_repo: UserRepository = Provide[Container.interfaces.user_repository],
+    database: Database = Provide[Container.adapters.database],
 ):
-    container.adapters.init_pony()
+    await database.create_schema()
 
     refresh_token_and_schedule(scheduler, yccli_wrapper, token_service)
 
@@ -64,7 +65,10 @@ async def main(
     dp.shutdown.register(on_shutdown)
     setup_routes(dp)
 
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await database.dispose()
 
 
 def on_startup():

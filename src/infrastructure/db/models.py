@@ -8,7 +8,7 @@ from src.domain.models import TransactionCategory, TransactionStatus
 
 
 def _enum(enum_cls):
-    """Хранит .value в VARCHAR, как раньше писал Pony EnumConverter."""
+    """Хранит .value в VARCHAR: так значения записаны в существующих таблицах."""
     return Enum(
         enum_cls,
         values_callable=lambda members: [m.value for m in members],
@@ -34,7 +34,7 @@ class Transaction(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     uuid: Mapped[Optional[str]] = mapped_column(String(255), default=None)
-    # Колонка называется "user": так её создавал Pony, существующие таблицы читаются как есть
+    # Колонка называется "user": так она названа в существующих таблицах, они читаются как есть
     user_id: Mapped[int] = mapped_column("user", ForeignKey("users.id"))
     user: Mapped[User] = relationship()
     status: Mapped[TransactionStatus] = mapped_column(_enum(TransactionStatus))

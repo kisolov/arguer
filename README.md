@@ -22,7 +22,7 @@ Telegram-бот, который помогает выигрывать споры
 src/
   domain/          модели, порты (интерфейсы), доменные сервисы (спор, биллинг, стоимость)
   application/uc/  юзкейсы: по одному на действие пользователя
-  infrastructure/  адаптеры: aiogram, Pony ORM (MySQL), Redis, Yandex Cloud, ЮKassa, GenAPI, APScheduler
+  infrastructure/  адаптеры: aiogram, SQLAlchemy 2 (async, MySQL), Redis, Yandex Cloud, ЮKassa, GenAPI, APScheduler
   presentation/    aiogram-роуты и middleware (регистрация, сессия, обработка ошибок)
 di.py              сборка зависимостей (dependency-injector)
 config.py          настройки на pydantic-settings, секреты как SecretStr
@@ -30,7 +30,7 @@ config.py          настройки на pydantic-settings, секреты к�
 
 Порт языковой модели (`LanguageModelInterface`) не знает про провайдера: принимает список `ChatMessage`, возвращает строку, а при сбое бросает `LanguageModelError`. Формат запроса и транспорт GenAPI целиком в адаптере `src/infrastructure/genapi.py`.
 
-Стек: Python 3.12, aiogram 3, Pony ORM + MySQL 8, Redis, dependency-injector, Yandex Cloud (SpeechKit, Object Storage), ЮKassa, Docker Compose.
+Стек: Python 3.12, aiogram 3, SQLAlchemy 2 (async) + MySQL 8, Redis, dependency-injector, Yandex Cloud (SpeechKit, Object Storage), ЮKassa, Docker Compose.
 
 ## Запуск
 
