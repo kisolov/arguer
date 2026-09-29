@@ -1,9 +1,7 @@
-from typing import List, Optional
+from typing import List
 
 from pony import orm
-from pony.orm import select
 
-from logs import logger
 from src.domain.exceptions import RecordNotFound
 from src.domain.models import Transaction, TransactionStatus
 from src.domain.ports.repositories import TransactionRepository

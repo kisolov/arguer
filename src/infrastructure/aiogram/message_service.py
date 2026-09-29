@@ -48,7 +48,7 @@ class Keyboards:
                 callback_data=Callbacks.BuyOptionSelectionCallback(option_index=indx),
             )
         builder.button(
-            text=f"Назад",
+            text="Назад",
             callback_data="buy_options_back",
         )
         builder.adjust(1)

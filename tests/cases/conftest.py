@@ -3,7 +3,6 @@ import pytest
 
 from dotenv import load_dotenv
 
-from di import Container
 from tests.test_di import TestContainer
 
 load_dotenv(".env")

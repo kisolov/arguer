@@ -1,4 +1,3 @@
-from typing import List
 
 from .base import SessionRelatedUseCase
 from ..session import Session

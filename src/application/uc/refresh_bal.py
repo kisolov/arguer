@@ -1,9 +1,8 @@
-from logs import logger
 from .base import SessionRelatedUseCase
 from ..session import Session
 from src.domain.ports import PaymentGateway
 from src.domain.ports.repositories import TransactionRepository
-from src.domain.models import TransactionStatus, MessageContext, User
+from src.domain.models import TransactionStatus, MessageContext
 from src.domain.operations import BillingService
 
 

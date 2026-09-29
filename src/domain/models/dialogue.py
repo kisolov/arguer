@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 
-from pyexpat.errors import messages
 
 from .unprocessed_message import UnprocessedMessage
 

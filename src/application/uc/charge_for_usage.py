@@ -1,5 +1,4 @@
 from .base import SessionRelatedUseCase
-from src.domain.exceptions import InsufficientFunds
 from src.domain.operations import BillingService
 from ..session import Session
 

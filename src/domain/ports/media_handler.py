@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 
-from .speech_recognition import SpeechRecognitionInterface
 from ..models import Media
 
 

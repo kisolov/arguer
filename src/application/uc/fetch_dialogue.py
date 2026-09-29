@@ -1,5 +1,4 @@
 from .base import SessionRelatedUseCase
-from src.domain.exceptions import ContextEmpty
 
 
 class FetchDialogue(SessionRelatedUseCase):

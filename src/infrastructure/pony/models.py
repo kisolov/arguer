@@ -1,10 +1,8 @@
-import enum
 from datetime import datetime
 
 from pony.orm import Database, PrimaryKey, Required, Set, Optional
 
 from src.domain.models import TransactionStatus, TransactionCategory
-from src.infrastructure.pony.converters import EnumConverter
 
 db = Database()
 

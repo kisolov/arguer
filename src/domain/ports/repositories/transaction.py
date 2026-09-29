@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import List
 
 from src.domain.models import Transaction
 from src.domain.ports.repositories import DomainRepository

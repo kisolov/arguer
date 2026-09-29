@@ -24,16 +24,6 @@ class YandexSpeechKit(SpeechRecognitionInterface):
 
     async def _prepare_and_upload_audio(self, audio_data: bytes, extension: str) -> str:
         """Внутренний метод для загрузки аудио в S3"""
-        content_type_map = {
-            "ogg": "audio/ogg",
-            "opus": "audio/opus",
-            "wav": "audio/wav",
-            "pcm": "audio/l16",
-            "mp3": "audio/mpeg",
-        }
-        content_type = content_type_map.get(
-            extension.lower(), "application/octet-stream"
-        )
         object_key = (
             f"speechkit/{datetime.now().strftime('%Y%m%d')}/{uuid.uuid4()}.{extension}"
         )

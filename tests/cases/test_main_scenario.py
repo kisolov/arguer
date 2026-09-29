@@ -1,6 +1,6 @@
 import pytest
 
-from src.application import AddMessageToUnprocessed, ClearContext
+from src.application import AddMessageToUnprocessed
 from src.domain.exceptions import (
     UndefinedDefendant,
     ContextEmpty,
