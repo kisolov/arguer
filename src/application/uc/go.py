@@ -44,11 +44,21 @@ class Go(SessionRelatedUseCase):
             self.session, argue_service=self.argue_service
         ).execute()
 
-        resolution = await ProcessArgue(self.dispute_resolver, argue).execute()
-
-        await self.session.message_service.delete_message(progress_message_ctx)
+        try:
+            resolution = await ProcessArgue(self.dispute_resolver, argue).execute()
+        finally:
+            await self.session.message_service.delete_message(progress_message_ctx)
 
         await HandleResolution(self.session).execute(argue, resolution)
         await ShowContextInfo(self.session).execute()
 
         await self.session.context_service.clear_state()
+
+        logger.info(
+            "Спор обработан",
+            extra={
+                "user_id": self.session.user.id,
+                "reasoning_count": len(argue.reasoning_list),
+                "context_symbols": argue.total_symbols,
+            },
+        )

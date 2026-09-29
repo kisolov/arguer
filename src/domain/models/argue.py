@@ -3,7 +3,6 @@ from typing import List
 
 from .reasoning import Reasoning
 from .speaker import Speaker
-from .llm_output import LLMOutput
 
 
 @dataclass
@@ -14,7 +13,7 @@ class Argue:
     def __add__(self, other):
         if isinstance(other, Argue):
             return Argue(self.reasoning_list + other.reasoning_list, self.defendant)
-        raise NotImplemented()
+        raise NotImplementedError()
 
     @property
     def total_symbols(self):
@@ -23,5 +22,5 @@ class Argue:
     def add_reasoning(self, reasoning: Reasoning):
         self.reasoning_list.append(reasoning)
 
-    def add_resolution(self, resolution: LLMOutput):
-        self.add_reasoning(Reasoning(resolution.generated_output, Speaker("assistant")))
+    def add_resolution(self, resolution: str):
+        self.add_reasoning(Reasoning(resolution, Speaker("assistant")))

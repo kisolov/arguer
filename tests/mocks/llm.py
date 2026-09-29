@@ -1,7 +1,7 @@
-from typing import Any, Dict
+from typing import Sequence
 from unittest.mock import AsyncMock
 
-from src.domain.models.llm_output import LLMOutput
+from src.domain.models import ChatMessage
 from src.domain.ports import LanguageModelInterface
 
 
@@ -10,39 +10,29 @@ class MockLanguageModel(LanguageModelInterface):
 
     def __init__(self):
         self._call_history = []
-        self.generate = AsyncMock(side_effect=self._generate_impl)
+        self.complete = AsyncMock(side_effect=self._complete_impl)
 
-    async def _generate_impl(
-        self,
-        payload: Dict[str, Any],
-        is_function: bool = False,
-        prefer_sync_api_call: bool = False,
-    ) -> LLMOutput:
-        """Implementation for generate method"""
-        self._call_history.append(
-            {
-                "payload": payload,
-                "is_function": is_function,
-                "prefer_sync_api_call": prefer_sync_api_call,
-            }
-        )
-
-        return LLMOutput(
-            generated_output=f"Async mock response for: {payload}",
-            full_response={"async_mock": True, "payload": payload},
-            request_id=len(self._call_history),
-        )
+    async def _complete_impl(self, messages: Sequence[ChatMessage]) -> str:
+        self._call_history.append(list(messages))
+        return f"Async mock response for: {len(messages)} messages"
 
     # Configuration methods
-    def set_return_value(self, llm_output: LLMOutput):
-        """Set return value for generate calls"""
-        self.generate.return_value = llm_output
+    def set_return_value(self, text: str):
+        """Set return value for complete calls"""
+        self.complete.side_effect = None
+        self.complete.return_value = text
         return self
 
     def set_side_effect(self, side_effect):
-        """Set side effect for generate calls"""
-        self.generate.side_effect = side_effect
+        """Set side effect for complete calls"""
+        self.complete.side_effect = side_effect
         return self
+
+    def reset(self):
+        """Back to default behaviour, forget recorded calls"""
+        self.complete.reset_mock(return_value=True, side_effect=True)
+        self.complete.side_effect = self._complete_impl
+        self._call_history.clear()
 
     # Test helper methods
     def get_call_history(self):

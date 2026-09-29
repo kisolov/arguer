@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import List
 
 from src.domain.models import MessageContext, Speaker, BuyOption
-from src.domain.models.llm_output import LLMOutput
 
 
 class Texts:
@@ -52,8 +51,8 @@ class MessageService(ABC):
             ctx, Texts.CHARGE_NOTIFICATION.format(amount=amount)
         )
 
-    async def send_resolution(self, ctx: MessageContext, resolution: LLMOutput):
-        return await self._send_message(ctx, resolution.generated_output)
+    async def send_resolution(self, ctx: MessageContext, resolution: str):
+        return await self._send_message(ctx, resolution)
 
     async def send_context_info(
         self, ctx: MessageContext, context_symbols: int, context_media_duration: int

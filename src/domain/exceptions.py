@@ -4,6 +4,9 @@ class DomainError(Exception): ...
 class BusinessLogicError(DomainError): ...
 
 
+class LanguageModelError(DomainError): ...
+
+
 class InsufficientFunds(BusinessLogicError):
     def __init__(self):
         super().__init__("Не хватает токенов! Пополнить баланс - /bal")

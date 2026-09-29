@@ -1,12 +1,9 @@
-from typing import Protocol, Any, Dict
+from typing import Protocol, Sequence
 
-from src.domain.models.llm_output import LLMOutput
+from src.domain.models.chat_message import ChatMessage
 
 
 class LanguageModelInterface(Protocol):
-    async def generate(
-        self,
-        payload: Dict[str, Any],
-        is_function: bool = False,
-        prefer_sync_api_call: bool = False,
-    ) -> LLMOutput: ...
+    async def complete(self, messages: Sequence[ChatMessage]) -> str:
+        """Возвращает текст ответа модели. При сбое бросает LanguageModelError."""
+        ...
