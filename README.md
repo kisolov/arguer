@@ -30,6 +30,8 @@ config.py          настройки на pydantic-settings, секреты к�
 
 Порт языковой модели (`LanguageModelInterface`) не знает про провайдера: принимает список `ChatMessage`, возвращает строку, а при сбое бросает `LanguageModelError`. Формат запроса и транспорт GenAPI целиком в адаптере `src/infrastructure/genapi.py`.
 
+Подробная документация: [docs/services](docs/services/ARCHITECTURE.md): схема, сценарии, инварианты, поведение при сбоях, обоснование решений.
+
 Стек: Python 3.12, aiogram 3, SQLAlchemy 2 (async) + MySQL 8, Redis, dependency-injector, Yandex Cloud (SpeechKit, Object Storage), ЮKassa, Docker Compose.
 
 ## Запуск
