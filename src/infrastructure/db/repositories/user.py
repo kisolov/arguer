@@ -2,6 +2,7 @@ import asyncio
 from typing import Optional
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.exceptions import InsufficientFunds, RecordNotFound
@@ -16,13 +17,22 @@ from ..setup import Database
 class SqlUserRepository(SqlRepositoryAdapter[User, models.User], UserRepository):
     def __init__(self, database: Database, session: Optional[AsyncSession] = None):
         super().__init__(database, session)
-        # Пачка апдейтов от нового пользователя идёт параллельно: без замка
-        # get-or-create создаст нескольких пользователей с одним telegram_id.
-        self._store_lock = asyncio.Lock()
+        # Пачка апдейтов от нового пользователя идёт параллельно. Замок сериализует
+        # регистрацию внутри процесса (и в БД, созданной без уникального индекса),
+        # уникальный индекс отсекает дубли между процессами.
+        self._create_lock = asyncio.Lock()
 
-    async def store(self, domain_user: User) -> User:
-        async with self._store_lock:
-            return await super().store(domain_user)
+    async def get_or_create(self, user: User) -> User:
+        async with self._create_lock:
+            try:
+                return await self.get(user)
+            except RecordNotFound:
+                pass
+            try:
+                return await self.store(user)
+            except IntegrityError:
+                # Параллельный вызов успел зарегистрировать этого пользователя
+                return await self.get(user)
 
     def _map(self, db_user: models.User) -> User:
         return SqlDomainMapper().user_to_domain(db_user)
@@ -34,6 +44,7 @@ class SqlUserRepository(SqlRepositoryAdapter[User, models.User], UserRepository)
             got = await session.scalar(
                 select(models.User)
                 .where(models.User.telegram_id == domain_user.telegram_id)
+                .order_by(models.User.id)
                 .limit(1)
             )
         if got is None:

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from src.application import EnsureUserExists
 from src.domain.exceptions import RecordNotFound
@@ -122,6 +122,61 @@ class TestSqlUserRepository(BaseTestGroup):
         assert sorted(u.telegram_id for u in stored) == list(range(1000, 1005))
         assert len({u.id for u in stored}) == 5
 
+
+    @pytest.mark.asyncio
+    async def test_get_or_create_returns_existing_user(self, users):
+        existing = await users.store(User(telegram_id=300, bal=5))
+
+        got = await users.get_or_create(User(telegram_id=300))
+
+        assert (got.id, got.bal) == (existing.id, 5)
+
+    @pytest.mark.asyncio
+    async def test_get_or_create_registers_unknown_user(self, users):
+        got = await users.get_or_create(User(telegram_id=301))
+
+        assert got.id is not None
+        assert (await users.get(User(telegram_id=301))).id == got.id
+
+    @pytest.mark.asyncio
+    async def test_separate_processes_cannot_create_duplicates(self, tmp_path):
+        # У каждого репозитория свой замок (как у отдельных процессов бота):
+        # дубли отсекает уникальный индекс, проигравший перечитывает победителя.
+        db = Database.from_config(
+            SimpleNamespace(provider="sqlite", filename=str(tmp_path / "procs.db"))
+        )
+        await db.create_schema()
+        repos = [SqlUserRepository(db) for _ in range(5)]
+
+        got = await asyncio.gather(
+            *(repo.get_or_create(User(telegram_id=666)) for repo in repos)
+        )
+        async with db.sessions() as session:
+            rows = (await session.scalars(select(models.User))).all()
+        await db.dispose()
+
+        assert len({u.id for u in got}) == 1
+        assert len(rows) == 1
+
+    @pytest.mark.asyncio
+    async def test_legacy_duplicates_resolve_to_the_oldest_user(self, tmp_path):
+        # В БД, созданной до уникального индекса, могли накопиться дубли
+        db = Database.from_config(
+            SimpleNamespace(provider="sqlite", filename=str(tmp_path / "legacy.db"))
+        )
+        await db.create_schema()
+        async with db.engine.begin() as connection:
+            await connection.execute(text("DROP INDEX ix_users_telegram_id"))
+            for bal in (10, 20):
+                await connection.execute(
+                    text("INSERT INTO users (telegram_id, bal) VALUES (900, :bal)"),
+                    {"bal": bal},
+                )
+
+        got = await SqlUserRepository(db).get(User(telegram_id=900))
+        await db.dispose()
+
+        assert (got.id, got.bal) == (1, 10)
 
     @pytest.mark.asyncio
     async def test_simultaneous_first_updates_register_one_user(self, tmp_path):

@@ -52,6 +52,12 @@ class InMemoryUserRepository(InMemoryRepository[User], UserRepository):
 
         raise RecordNotFound(user)
 
+    async def get_or_create(self, user: User) -> User:
+        try:
+            return await self.get(user)
+        except RecordNotFound:
+            return await self.store(user)
+
     async def change_balance(self, user_id: int, delta: float) -> User:
         stored = self._storage.get(user_id)
         if stored is None:
