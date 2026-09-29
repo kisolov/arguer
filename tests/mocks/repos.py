@@ -17,7 +17,7 @@ class InMemoryRepository(DomainRepository[DomainEntity], Generic[DomainEntity]):
         self._storage: Dict[int, DomainEntity] = {}
         self._next_id = 1
 
-    def store(self, domain_entity: DomainEntity) -> DomainEntity:
+    async def store(self, domain_entity: DomainEntity) -> DomainEntity:
         if domain_entity.id is None:
             domain_entity.id = self._next_id
             self._next_id += 1
@@ -25,7 +25,7 @@ class InMemoryRepository(DomainRepository[DomainEntity], Generic[DomainEntity]):
         self._storage[domain_entity.id] = domain_entity
         return domain_entity
 
-    def get(self, domain_entity: DomainEntity) -> DomainEntity:
+    async def get(self, domain_entity: DomainEntity) -> DomainEntity:
         if domain_entity.id is None or domain_entity.id not in self._storage:
             raise RecordNotFound(domain_entity)
 
@@ -35,7 +35,7 @@ class InMemoryRepository(DomainRepository[DomainEntity], Generic[DomainEntity]):
 class InMemoryUserRepository(InMemoryRepository[User], UserRepository):
     """In-memory репозиторий для User"""
 
-    def get(self, user: User) -> User:
+    async def get(self, user: User) -> User:
         if user.id and user.id in self._storage:
             return self._storage[user.id]
 
@@ -52,7 +52,7 @@ class InMemoryTransactionRepository(
 ):
     """In-memory репозиторий для Transaction"""
 
-    def get_pending_transactions_for(self, user_id: int) -> List[Transaction]:
+    async def get_pending_transactions_for(self, user_id: int) -> List[Transaction]:
         return [
             t
             for t in self._storage.values()

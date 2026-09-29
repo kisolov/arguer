@@ -111,7 +111,7 @@ class TestSendPaymentLink(BillingTestGroup):
         await SendPaymentLink(session, gateway, options_repo, billing).execute()
 
         gateway.create_payment.assert_awaited_once_with(option.price, option.description)
-        pending = transactions.get_pending_transactions_for(session.user.id)
+        pending = await transactions.get_pending_transactions_for(session.user.id)
         assert [(t.uuid, t.amount) for t in pending] == [
             ("uuid-1", option.tokens_amount)
         ]
@@ -130,7 +130,7 @@ class TestSendPaymentLink(BillingTestGroup):
             await SendPaymentLink(session, gateway, options_repo, billing).execute()
 
         gateway.create_payment.assert_not_awaited()
-        assert transactions.get_pending_transactions_for(session.user.id) == []
+        assert await transactions.get_pending_transactions_for(session.user.id) == []
 
 
 class TestRefreshBalance(BillingTestGroup):
@@ -157,7 +157,7 @@ class TestRefreshBalance(BillingTestGroup):
     async def test_completed_payment_credits_balance_and_refreshes_menu(
         self, popup_session, refresh, gateway, billing
     ):
-        billing.record_top_up(popup_session.user, 500, "uuid-ok")
+        await billing.record_top_up(popup_session.user, 500, "uuid-ok")
         gateway.get_payment_status.return_value = TransactionStatus.COMPLETED
 
         await refresh.execute()
@@ -171,32 +171,33 @@ class TestRefreshBalance(BillingTestGroup):
     async def test_canceled_payment_is_closed_without_credit(
         self, popup_session, refresh, gateway, billing, transactions
     ):
-        billing.record_top_up(popup_session.user, 500, "uuid-no")
+        await billing.record_top_up(popup_session.user, 500, "uuid-no")
         gateway.get_payment_status.return_value = TransactionStatus.CANCELED
 
         await refresh.execute()
 
         assert popup_session.user.bal == 1000
-        assert transactions.get_pending_transactions_for(popup_session.user.id) == []
+        assert await transactions.get_pending_transactions_for(popup_session.user.id) == []
         popup_session.message_service.send_balance_menu.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_still_pending_payment_is_left_alone(
         self, popup_session, refresh, gateway, billing, transactions
     ):
-        billing.record_top_up(popup_session.user, 500, "uuid-wait")
+        await billing.record_top_up(popup_session.user, 500, "uuid-wait")
         gateway.get_payment_status.return_value = TransactionStatus.PENDING
 
         await refresh.execute()
 
         assert popup_session.user.bal == 1000
-        assert len(transactions.get_pending_transactions_for(popup_session.user.id)) == 1
+        pending = await transactions.get_pending_transactions_for(popup_session.user.id)
+        assert len(pending) == 1
 
     @pytest.mark.asyncio
     async def test_transaction_without_uuid_is_not_sent_to_gateway(
         self, popup_session, refresh, gateway, billing
     ):
-        billing.record_top_up(popup_session.user, 500, None)
+        await billing.record_top_up(popup_session.user, 500, None)
 
         await refresh.execute()
 

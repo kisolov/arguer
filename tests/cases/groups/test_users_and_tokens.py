@@ -14,19 +14,21 @@ class TestEnsureUserExists(BaseTestGroup):
     def users(self):
         return self.container.interfaces.user_repository()
 
-    def test_registers_unknown_telegram_user(self, users):
-        user = EnsureUserExists(users, telegram_id=9001).execute()
+    @pytest.mark.asyncio
+    async def test_registers_unknown_telegram_user(self, users):
+        user = await EnsureUserExists(users, telegram_id=9001).execute()
 
         assert user.id is not None
         assert user.telegram_id == 9001
         assert user.bal == 150
 
-    def test_returns_existing_user_without_duplicating(self, users):
-        first = EnsureUserExists(users, telegram_id=9002).execute()
+    @pytest.mark.asyncio
+    async def test_returns_existing_user_without_duplicating(self, users):
+        first = await EnsureUserExists(users, telegram_id=9002).execute()
         first.bal = 5
-        users.store(first)
+        await users.store(first)
 
-        second = EnsureUserExists(users, telegram_id=9002).execute()
+        second = await EnsureUserExists(users, telegram_id=9002).execute()
 
         assert second.id == first.id
         assert second.bal == 5

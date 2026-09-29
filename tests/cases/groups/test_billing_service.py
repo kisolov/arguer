@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 
 from src.domain.exceptions import InsufficientFunds
 from src.domain.models import (
@@ -27,9 +28,9 @@ class TestBillingService(BaseTestGroup):
     def users(self):
         return self.container.interfaces.user_repository()
 
-    @pytest.fixture
-    def stored_user(self, users):
-        return users.store(User(telegram_id=42, bal=100))
+    @pytest_asyncio.fixture
+    async def stored_user(self, users):
+        return await users.store(User(telegram_id=42, bal=100))
 
     @pytest.fixture
     def dialogue(self):
@@ -45,12 +46,13 @@ class TestBillingService(BaseTestGroup):
 
         assert billing.calculate_dialogue_cost(dialogue) == pytest.approx(expected)
 
-    def test_charge_decreases_balance_and_records_usage(
+    @pytest.mark.asyncio
+    async def test_charge_decreases_balance_and_records_usage(
         self, billing, stored_user, dialogue, transactions
     ):
         cost = billing.calculate_dialogue_cost(dialogue)
 
-        billing.charge_for_dialogue(stored_user, dialogue)
+        await billing.charge_for_dialogue(stored_user, dialogue)
 
         assert stored_user.bal == pytest.approx(100 - cost)
         usage = [
@@ -62,53 +64,60 @@ class TestBillingService(BaseTestGroup):
         assert usage[0].status == TransactionStatus.COMPLETED
         assert usage[0].amount == pytest.approx(-cost)
 
-    def test_charge_with_insufficient_funds_keeps_balance(
+    @pytest.mark.asyncio
+    async def test_charge_with_insufficient_funds_keeps_balance(
         self, billing, users, dialogue
     ):
-        poor = users.store(User(telegram_id=43, bal=1))
+        poor = await users.store(User(telegram_id=43, bal=1))
 
         with pytest.raises(InsufficientFunds):
-            billing.charge_for_dialogue(poor, dialogue)
+            await billing.charge_for_dialogue(poor, dialogue)
 
         assert poor.bal == 1
 
-    def test_record_top_up_stores_pending_transaction(
+    @pytest.mark.asyncio
+    async def test_record_top_up_stores_pending_transaction(
         self, billing, stored_user, transactions
     ):
-        billing.record_top_up(stored_user, 500, "pay-1")
+        await billing.record_top_up(stored_user, 500, "pay-1")
 
-        pending = transactions.get_pending_transactions_for(stored_user.id)
+        pending = await transactions.get_pending_transactions_for(stored_user.id)
         assert [(t.uuid, t.amount) for t in pending] == [("pay-1", 500)]
         assert stored_user.bal == 100
 
-    def test_apply_transaction_credits_balance_and_completes(
+    @pytest.mark.asyncio
+    async def test_apply_transaction_credits_balance_and_completes(
         self, billing, stored_user, transactions
     ):
-        billing.record_top_up(stored_user, 500, "pay-2")
-        pending = transactions.get_pending_transactions_for(stored_user.id)[0]
+        await billing.record_top_up(stored_user, 500, "pay-2")
+        pending = (await transactions.get_pending_transactions_for(stored_user.id))[0]
 
-        billing.apply_transaction(pending)
+        await billing.apply_transaction(pending)
 
         assert stored_user.bal == 600
         assert pending.status == TransactionStatus.COMPLETED
-        assert transactions.get_pending_transactions_for(stored_user.id) == []
+        assert await transactions.get_pending_transactions_for(stored_user.id) == []
 
-    def test_cancel_transaction_marks_canceled_without_touching_balance(
+    @pytest.mark.asyncio
+    async def test_cancel_transaction_marks_canceled_without_touching_balance(
         self, billing, stored_user, transactions
     ):
-        billing.record_top_up(stored_user, 500, "pay-3")
-        pending = transactions.get_pending_transactions_for(stored_user.id)[0]
+        await billing.record_top_up(stored_user, 500, "pay-3")
+        pending = (await transactions.get_pending_transactions_for(stored_user.id))[0]
 
-        billing.cancel_transaction(pending)
+        await billing.cancel_transaction(pending)
 
         assert pending.status == TransactionStatus.CANCELED
         assert stored_user.bal == 100
 
-    def test_apply_transaction_exact_balance_is_allowed(self, billing, stored_user):
+    @pytest.mark.asyncio
+    async def test_apply_transaction_exact_balance_is_allowed(
+        self, billing, stored_user
+    ):
         transaction = Transaction(
             user=stored_user, category=TransactionCategory.USAGE, amount=-100
         )
 
-        billing.apply_transaction(transaction)
+        await billing.apply_transaction(transaction)
 
         assert stored_user.bal == 0

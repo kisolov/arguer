@@ -10,7 +10,7 @@ class ChargeForUsage(SessionRelatedUseCase):
 
     async def execute(self, dialogue):
         cost = self.billing_service.calculate_dialogue_cost(dialogue)
-        self.billing_service.charge_for_dialogue(self.session.user, dialogue)
+        await self.billing_service.charge_for_dialogue(self.session.user, dialogue)
         await self.session.message_service.notify_charge(
             self.session.answer_message_context, cost
         )

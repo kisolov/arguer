@@ -22,7 +22,7 @@ class RefreshBalance(SessionRelatedUseCase):
         self.formula = formula
 
     async def execute(self):
-        pending = self.transaction_repo.get_pending_transactions_for(
+        pending = await self.transaction_repo.get_pending_transactions_for(
             self.session.user.id
         )
         if not pending:
@@ -39,11 +39,11 @@ class RefreshBalance(SessionRelatedUseCase):
 
     async def _process_transaction(self, transaction, status: TransactionStatus):
         if status is TransactionStatus.COMPLETED:
-            self.billing_service.apply_transaction(transaction)
+            await self.billing_service.apply_transaction(transaction)
             self.session.event.user = transaction.user
             await self._update_window()
         elif status is TransactionStatus.CANCELED:
-            self.billing_service.cancel_transaction(transaction)
+            await self.billing_service.cancel_transaction(transaction)
 
     async def _notify_updated(self):
         await self.session.popup_service.notify_updated()

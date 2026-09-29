@@ -27,7 +27,7 @@ class SendPaymentLink(SessionRelatedUseCase):
         payment = await self.payment_gateway.create_payment(
             buy_option.price, buy_option.description
         )
-        self.billing_service.record_top_up(
+        await self.billing_service.record_top_up(
             self.session.user, buy_option.tokens_amount, payment.payment_uuid
         )
 

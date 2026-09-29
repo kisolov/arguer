@@ -17,7 +17,7 @@ class RegistrationMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: Dict[str, Any],
     ) -> Any:
-        data["user"] = EnsureUserExists(
+        data["user"] = await EnsureUserExists(
             self.user_repo, data["event_context"].chat.id
         ).execute()
         return await handler(event, data)
