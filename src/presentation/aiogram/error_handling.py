@@ -22,7 +22,11 @@ class ErrorHandlingMiddleware(BaseMiddleware):
                 session.answer_message_context, e
             )
         except Exception as e:
-            logger.error(f"Неожиданная ошибка: {e}, session={session}", exc_info=True)
+            logger.error(
+                "Неожиданная ошибка",
+                extra={"user_id": session.user.id, "exception": type(e).__name__},
+                exc_info=True,
+            )
             await session.message_service.send_error_message(
                 session.answer_message_context, UnexpectedError()
             )

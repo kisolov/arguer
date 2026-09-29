@@ -1,17 +1,6 @@
-import os
 from typing import Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, SecretStr
-
-
-if os.environ.get("BUILD_MODE") == "debug":
-    import pydevd_pycharm
-
-    pydevd_pycharm.settrace(
-        "host.docker.internal",
-        port=5688,
-        suspend=False,  # True — остановка на этой строке, False — сразу продолжить
-    )
 
 
 class BaseAppConfig(BaseSettings):
@@ -87,12 +76,6 @@ class GenAPIConfig(BaseAppConfig):
     default_timeout_seconds: int = Field(
         default=30, alias="GENAPI_DEFAULT_TIMEOUT_SECONDS"
     )
-    long_poll_timeout_seconds: int = Field(
-        default=300, alias="GENAPI_LONG_POLL_TIMEOUT_SECONDS"
-    )
-    default_poll_interval_seconds: int = Field(
-        default=5, alias="GENAPI_DEFAULT_POLL_INTERVAL_SECONDS"
-    )
     max_retries: int = Field(default=3)
     enable_compression: bool = Field(default=True)
 
@@ -129,6 +112,7 @@ class AppConfig(BaseAppConfig):
     unprocessed_media_duration_limit: int = Field(
         ..., alias="APP_UNPROCESSED_MEDIA_DURATION_LIMIT"
     )
+    enable_test_messages: bool = Field(False, alias="APP_ENABLE_TEST_MESSAGES")
 
     model_config = SettingsConfigDict(env_prefix="APP_")
 

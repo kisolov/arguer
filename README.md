@@ -28,6 +28,8 @@ di.py              сборка зависимостей (dependency-injector)
 config.py          настройки на pydantic-settings, секреты как SecretStr
 ```
 
+Порт языковой модели (`LanguageModelInterface`) не знает про провайдера: принимает список `ChatMessage`, возвращает строку, а при сбое бросает `LanguageModelError`. Формат запроса и транспорт GenAPI целиком в адаптере `src/infrastructure/genapi.py`.
+
 Стек: Python 3.12, aiogram 3, Pony ORM + MySQL 8, Redis, dependency-injector, Yandex Cloud (SpeechKit, Object Storage), ЮKassa, Docker Compose.
 
 ## Запуск
@@ -40,6 +42,10 @@ make log c=telegram-bot
 ```
 
 `.env` и `yc_config.yaml` в git не попадают.
+
+MySQL и phpMyAdmin слушают только `127.0.0.1`. phpMyAdmin поднимается отдельно: `make up-dev`.
+
+Для ручной отладки без пересылки сообщений можно включить `APP_ENABLE_TEST_MESSAGES=true`: бот начнёт принимать реплики вида `текст (id)` как пересланные от пользователя `id`. В проде должно быть `false`.
 
 ## Тесты
 

@@ -6,7 +6,6 @@ from aiogram.filters import StateFilter
 
 from config import AppConfig
 from di import container
-from logs import logger
 from src.application import (
     SendInstructions,
     SendBalanceMenu,
@@ -31,6 +30,7 @@ from src.infrastructure import Callbacks, States
 container.wire(modules=[__name__])
 
 router = Router()
+test_router = Router()
 
 
 def with_deps(*deps):
@@ -47,8 +47,6 @@ def with_deps(*deps):
                     for part in dep.split("."):
                         provider = getattr(provider, part)
                     resolved_deps[arg_name] = provider()
-            logger.info(event)
-            logger.info({**kwargs, **resolved_deps})
             return await handler(event, **{**kwargs, **resolved_deps})
 
         return wrapper
@@ -107,12 +105,10 @@ async def handle_forwarded_message(session: Session, **kwargs):
     await AddMessageToUnprocessed(session, **kwargs).execute()
 
 
-@router.message(F.text.regexp(r"^(.*)\s+\((\d+)\)$"))
+@test_router.message(F.text.regexp(r"^(.*)\s+\((\d+)\)$"))
 @with_deps("config.app_config")
-async def handle_test_message(
-    session: Session,  # Ваш @with_deps передает сюда сессию
-    app_config: AppConfig,  # Ваш @with_deps передает сюда конфиг
-):
+async def handle_test_message(session: Session, app_config: AppConfig):
+    """Имитация пересланного сообщения: `текст (id)`. Только при APP_ENABLE_TEST_MESSAGES=true."""
     match = re.match(r"^(.*)\s+\((\d+)\)$", session.event.data)
     if not match:
         return
@@ -166,3 +162,5 @@ async def send_payment_link(session: Session, **kwargs):
 
 def setup_routes(dp: Dispatcher):
     dp.include_router(router)
+    if container.config.app_config().enable_test_messages:
+        dp.include_router(test_router)

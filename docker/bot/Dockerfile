@@ -21,11 +21,6 @@ COPY yc_config.yaml /root/.config/yandex-cloud/config.yaml
 RUN yc config list
 RUN yc config profile activate default
 
-FROM base as debug
-RUN pip install pydevd-pycharm~=242.24807.21
-RUN pip install --no-cache-dir -r requirements.txt
-CMD ["python", "main.py"]
-
 FROM base AS production
 RUN pip install --no-cache-dir -r requirements.txt
 CMD ["python", "main.py"]

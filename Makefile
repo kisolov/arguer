@@ -1,10 +1,13 @@
-.PHONY: build up down restart log ps debug db-volume-purge
+.PHONY: build up up-dev down restart log ps db-volume-purge
 
 build:
 	docker-compose build $(c)
 
 up:
 	docker-compose up -d $(c)
+
+up-dev:
+	docker-compose --profile dev up -d $(c)
 
 down:
 	docker-compose down $(c)
