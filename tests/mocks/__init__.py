@@ -1,4 +1,5 @@
 from .context_service import MockContextService
+from .key_value_storage import InMemoryKeyValueStorage
 from .llm import MockLanguageModel
 from .media_handler import MockMediaHandler
 from .message_service import MockMessageService
