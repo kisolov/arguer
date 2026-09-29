@@ -1,0 +1,91 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_db
+    env_file: .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${DB_DATABASE:-tg_bot_db}
+      MYSQL_USER: ${DB_USER:-tg_bot_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-botpass}
+      TZ: Europe/Moscow
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD" ]
+      interval: 10s
+      timeout: 30s
+      retries: 25
+      start_period: 30s
+    networks:
+      - bot_network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_cache
+    env_file: .env
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - bot_network
+    restart: unless-stopped
+
+  phpmyadmin:
+    image: phpmyadmin:5.2.2
+    container_name: pma
+    env_file: .env
+    depends_on:
+      - mysql
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: ${DB_ROOT_PASSWORD:-rootpass}
+      TZ: Europe/Moscow
+    ports:
+      - "8080:80"
+    networks:
+      - bot_network
+    restart: unless-stopped
+
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: docker/bot/Dockerfile
+      target: ${BUILD_MODE:-test}
+    container_name: tg_bot
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+      - ./config.py:/app/config.py
+      - ./main.py:/app/main.py
+      - ./.env:/app/.env
+      - ./di.py:/app/di.py
+    environment:
+      TZ: Europe/Moscow
+    networks:
+      - bot_network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  bot_network:
+    driver: bridge
