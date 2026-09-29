@@ -119,6 +119,8 @@ class AdaptersContainer(containers.DeclarativeContainer):
     )
 
     # SQL (SQLAlchemy)
+    # Singleton, а не Resource: engine создаётся лениво и без I/O, а закрывает его
+    # main() через dispose() в finally. Resource дал бы незавершённый Future вне async-контекста.
     database = providers.Singleton(Database.from_config, config.db_config)
     sql_user_repo = providers.Singleton(SqlUserRepository, database)
     sql_transaction_repo = providers.Singleton(SqlTransactionRepository, database)

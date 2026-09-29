@@ -36,7 +36,8 @@ class Transaction(Base):
     uuid: Mapped[Optional[str]] = mapped_column(String(255), default=None)
     # Колонка называется "user": так она названа в существующих таблицах, они читаются как есть
     user_id: Mapped[int] = mapped_column("user", ForeignKey("users.id"))
-    user: Mapped[User] = relationship()
+    # Владелец грузится явно (selectinload): неявная ленивая загрузка в async запрещена
+    user: Mapped[User] = relationship(lazy="raise")
     status: Mapped[TransactionStatus] = mapped_column(_enum(TransactionStatus))
     category: Mapped[TransactionCategory] = mapped_column(_enum(TransactionCategory))
     amount: Mapped[float] = mapped_column(Double)

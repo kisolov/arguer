@@ -13,25 +13,24 @@ class Database:
     @classmethod
     def from_config(cls, config) -> "Database":
         if config.provider == "sqlite":
+            # Только для тестов: aiosqlite стоит в requirements-dev.txt, в DatabaseConfig нет filename
             url = URL.create("sqlite+aiosqlite", database=config.filename)
             kwargs = {"poolclass": StaticPool} if config.filename == ":memory:" else {}
             return cls(url, **kwargs)
 
-        password = (
-            config.password.get_secret_value()
-            if hasattr(config.password, "get_secret_value")
-            else config.password
-        )
-        url = URL.create(
-            "mysql+aiomysql",
-            username=config.user,
-            password=password,
-            host=config.host,
-            port=config.port,
-            database=config.database,
-            query={"charset": getattr(config, "charset", "utf8mb4")},
-        )
-        return cls(url, pool_pre_ping=True)
+        if config.provider == "mysql":
+            url = URL.create(
+                "mysql+aiomysql",
+                username=config.user,
+                password=config.password.get_secret_value(),
+                host=config.host,
+                port=config.port,
+                database=config.database,
+                query={"charset": "utf8mb4"},
+            )
+            return cls(url, pool_pre_ping=True)
+
+        raise ValueError(f"Unknown database provider: {config.provider}")
 
     async def create_schema(self) -> None:
         async with self.engine.begin() as connection:
