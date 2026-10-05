@@ -8,8 +8,9 @@ class Dialogue:
     messages: list[UnprocessedMessage] = field(default_factory=list)
 
     @property
-    def partipitians(self):
-        return list({r.speaker for r in self.messages})
+    def participants(self):
+        """Уникальные участники в порядке имён: порядок не зависит от хэшей."""
+        return sorted({r.speaker for r in self.messages}, key=lambda s: s.name)
 
     @property
     def media_duration(self):

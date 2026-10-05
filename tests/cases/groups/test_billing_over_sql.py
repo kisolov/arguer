@@ -1,6 +1,7 @@
 """Биллинг поверх реальных SQL-репозиториев: атомарность и идемпотентность начислений."""
 
 import asyncio
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -155,6 +156,21 @@ class TestBillingOverSql(BaseTestGroup):
         stored = await transactions.get(pending)
         assert stored.status is TransactionStatus.COMPLETED
         assert (await users.get(user)).bal == 250
+
+    @pytest.mark.asyncio
+    async def test_many_small_charges_keep_balance_exact(self, billing, users, user):
+        for _ in range(10):
+            await billing.apply_transaction(
+                Transaction(
+                    user=user,
+                    category=TransactionCategory.USAGE,
+                    amount=Decimal("-0.10"),
+                )
+            )
+
+        stored = await users.get(user)
+        assert isinstance(stored.bal, Decimal)
+        assert stored.bal == Decimal("149.00")
 
     @pytest.mark.asyncio
     async def test_refund_returns_charge_as_separate_record(

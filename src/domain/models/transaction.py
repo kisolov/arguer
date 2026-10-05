@@ -1,6 +1,7 @@
 import enum
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
 from src.domain.models import User
@@ -20,7 +21,7 @@ class TransactionCategory(enum.Enum):
 class Transaction:
     user: User = field(metadata={"ignore": True})
     category: TransactionCategory
-    amount: float
+    amount: Decimal
     status: TransactionStatus = TransactionStatus.PENDING
     id: Optional[int] = None
     uuid: Optional[str] = None

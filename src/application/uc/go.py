@@ -43,7 +43,7 @@ class Go(SessionRelatedUseCase):
         try:
             charge = await ChargeForUsage(
                 self.session, billing_service=self.billing_service
-            ).execute(dialogue)
+            ).execute(dialogue, history=processed_before)
             try:
                 argue = await self._resolve()
             except BaseException:

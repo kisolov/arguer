@@ -6,11 +6,13 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from src.domain.models import MessageContext, Speaker, BuyOption
 from src.domain.ports import MessageService, Texts
+from .telegram_html import split_message, to_telegram_html
 
 
 class Callbacks:
     class DefendantSelectionCallback(CallbackData, prefix="def_sel"):
-        defendant_name: str
+        # Номер в меню: имя не влезает в 64 байта callback_data и может содержать ':'
+        defendant_index: int
 
     class BuyOptionSelectionCallback(CallbackData, prefix="buy_options"):
         option_index: int
@@ -33,8 +35,8 @@ class Keyboards:
     @staticmethod
     def defendant_selection(variants: List[Speaker]) -> InlineKeyboardMarkup:
         builder = InlineKeyboardBuilder()
-        for variant in variants:
-            callback = Callbacks.DefendantSelectionCallback(defendant_name=variant.name)
+        for index, variant in enumerate(variants):
+            callback = Callbacks.DefendantSelectionCallback(defendant_index=index)
             builder.button(text=variant.name, callback_data=callback)
         builder.adjust(1)
         return builder.as_markup()
@@ -85,6 +87,14 @@ class AiogramMessageService(MessageService):
 
     async def delete_message(self, ctx: MessageContext):
         await self.bot.delete_message(ctx.user.telegram_id, ctx.message_id)
+
+    async def send_resolution(self, ctx: MessageContext, resolution: str):
+        """Текст модели не доверенный: лишние символы разметки и длина больше
+        4096 иначе обрывают отправку ответа, за который уже заплачено."""
+        sent = None
+        for chunk in split_message(resolution):
+            sent = await self._send_message(ctx, to_telegram_html(chunk))
+        return sent
 
     async def send_balance_menu(self, ctx: MessageContext, formula: str):
         text = Texts.BALANCE_INFO.format(balance=ctx.user.bal, formula=formula)

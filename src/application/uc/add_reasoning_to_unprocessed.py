@@ -4,6 +4,7 @@ from src.domain.models import Dialogue, UnprocessedMessage
 from src.domain.operations import UnprocessedMessageFactory
 from src.domain.exceptions import (
     ContextEmpty,
+    ContextLimitExceeded,
     MessagesLimitExceeded,
     MediaLimitExceeded,
 )
@@ -14,6 +15,7 @@ class AddMessageToUnprocessed(SessionRelatedUseCase):
     def __init__(self, session: Session, app_config: AppConfig):
         self.messages_limit = app_config.unprocessed_messages_limit
         self.media_limit_seconds = app_config.unprocessed_media_duration_limit
+        self.context_symbols_limit = app_config.context_symbols_limit
         super().__init__(session)
 
     async def execute(self):
@@ -26,8 +28,26 @@ class AddMessageToUnprocessed(SessionRelatedUseCase):
         except ContextEmpty:
             dialogue = Dialogue()
         self._validate_addition(dialogue, unprocessed_message)
+        await self._validate_context_size(dialogue, unprocessed_message)
         dialogue.add_message(unprocessed_message)
         await self.session.context_service.set_unprocessed(dialogue)
+
+    async def _validate_context_size(
+        self, dialogue: Dialogue, new_message: UnprocessedMessage
+    ):
+        """Вся история спора уходит в модель, у которой ограничен контекст.
+
+        Голос ещё не распознан и не считается: его объём за раунд ограничен
+        лимитом длительности.
+        """
+        history = await self.session.context_service.get_processed()
+        total = (
+            (history.total_symbols if history else 0)
+            + dialogue.total_symbols
+            + len(new_message.text or "")
+        )
+        if total > self.context_symbols_limit:
+            raise ContextLimitExceeded(self.context_symbols_limit)
 
     async def _create_unprocessed(self):
         unprocessed_message = UnprocessedMessageFactory().create(

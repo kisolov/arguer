@@ -1,12 +1,15 @@
 from dataclasses import replace
-from typing import Callable
+from decimal import Decimal
+from typing import Callable, Optional
 
 from src.domain.models import (
+    Argue,
     TransactionCategory,
     TransactionStatus,
     Transaction,
     User,
     Dialogue,
+    money,
 )
 from .cost_calculator import CostCalculator
 from src.domain.ports import UnitOfWork
@@ -24,16 +27,27 @@ class BillingService:
         self.unit_of_work = unit_of_work
         self.cost_calculator = cost_calculator
 
-    def calculate_dialogue_cost(self, dialogue: Dialogue):
+    def calculate_dialogue_cost(
+        self, dialogue: Dialogue, history: Optional[Argue] = None
+    ) -> Decimal:
+        """Цена запроса: новые сообщения плюс прошлые раунды спора.
+
+        Модель получает всю историю, поэтому её символы тоже оплачиваются.
+        Голос прошлых раундов уже распознан и считается как текст.
+        """
         voice_seconds = sum(
             msg.media.duration for msg in dialogue.messages if msg.media
         )
         text_symbols = sum(len(msg.text) for msg in dialogue.messages if msg.text)
+        if history:
+            text_symbols += history.total_symbols
 
         return self.cost_calculator.calculate_cost(voice_seconds, text_symbols)
 
-    async def charge_for_dialogue(self, user: User, dialogue: Dialogue) -> Transaction:
-        cost = self.calculate_dialogue_cost(dialogue)
+    async def charge_for_dialogue(
+        self, user: User, dialogue: Dialogue, history: Optional[Argue] = None
+    ) -> Transaction:
+        cost = self.calculate_dialogue_cost(dialogue, history)
 
         transaction = self._create_transaction(
             user, -cost, TransactionCategory.USAGE, TransactionStatus.COMPLETED
@@ -55,13 +69,13 @@ class BillingService:
         await self.apply_transaction(refund)
         return refund
 
-    async def record_top_up(self, user: User, amount: float, uuid: str):
+    async def record_top_up(self, user: User, amount: Decimal | int, uuid: str):
         transaction = self._create_transaction(
             user, amount, category=TransactionCategory.TOP_UP, uuid=uuid
         )
         await self.transaction_repository.store(transaction)
 
-    async def open_top_up(self, user: User, amount: float) -> Transaction:
+    async def open_top_up(self, user: User, amount: Decimal | int) -> Transaction:
         """Записывает пополнение до создания платежа: оплата не может пройти без записи.
 
         Пока платёж не привязан (uuid пуст), проверка баланса транзакцию пропускает.
@@ -77,13 +91,17 @@ class BillingService:
     def _create_transaction(
         self,
         user: User,
-        amount: float,
+        amount: Decimal | int,
         category: TransactionCategory,
         status: TransactionStatus = TransactionStatus.PENDING,
         uuid: str = None,
     ):
         return Transaction(
-            user=user, amount=amount, category=category, status=status, uuid=uuid
+            user=user,
+            amount=money(amount),
+            category=category,
+            status=status,
+            uuid=uuid,
         )
 
     async def apply_transaction(self, transaction: Transaction):

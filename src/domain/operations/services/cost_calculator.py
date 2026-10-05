@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from config import CostConfig
+from src.domain.models import money
 
 
 class CostCalculator:
@@ -14,8 +17,9 @@ class CostCalculator:
             f"({int(self.voice_second_cost * 60)}✨ за распознавание 1 минуты голоса)"
         )
 
-    def calculate_cost(self, voice_seconds: int, text_symbols: int):
-        return (
+    def calculate_cost(self, voice_seconds: int, text_symbols: int) -> Decimal:
+        """Цена считается точно и округляется до сотых один раз, в конце."""
+        return money(
             self.default_cost
             + voice_seconds * self.voice_second_cost
             + text_symbols * self.text_symbol_cost

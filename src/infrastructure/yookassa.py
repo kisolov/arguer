@@ -1,3 +1,4 @@
+from decimal import Decimal
 import uuid
 import asyncio
 from yookassa import Payment as YooClient, Configuration
@@ -21,7 +22,7 @@ class YooKassaGateway(PaymentGateway):
         Configuration.secret_key = config.secret_key.get_secret_value()
         self.return_url = config.return_url
 
-    async def create_payment(self, amount: float, description: str) -> PaymentInfo:
+    async def create_payment(self, amount: Decimal | int, description: str) -> PaymentInfo:
         # Простой способ - без явного получения loop
         payment: PaymentResponse = await asyncio.to_thread(
             YooClient.create,

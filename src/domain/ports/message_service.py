@@ -1,3 +1,4 @@
+from decimal import Decimal
 from abc import ABC, abstractmethod
 from typing import List
 
@@ -47,12 +48,12 @@ class MessageService(ABC):
         text = Texts.BALANCE_INFO.format(balance=ctx.user.bal, formula=formula)
         return await self._send_message(ctx, text)
 
-    async def notify_charge(self, ctx: MessageContext, amount: float):
+    async def notify_charge(self, ctx: MessageContext, amount: Decimal):
         return await self._send_message(
             ctx, Texts.CHARGE_NOTIFICATION.format(amount=amount)
         )
 
-    async def notify_refund(self, ctx: MessageContext, amount: float):
+    async def notify_refund(self, ctx: MessageContext, amount: Decimal):
         return await self._send_message(
             ctx, Texts.REFUND_NOTIFICATION.format(amount=amount)
         )

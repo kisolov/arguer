@@ -75,7 +75,9 @@ class TestAiogramMessageService(BaseTestGroup):
         rows = bot.send_message.await_args.kwargs["reply_markup"].inline_keyboard
         assert [row[0].text for row in rows] == ["Аня", "Боря"]
         packed = rows[0][0].callback_data
-        assert Callbacks.DefendantSelectionCallback.unpack(packed).defendant_name == "Аня"
+        assert Callbacks.DefendantSelectionCallback.unpack(packed).defendant_index == 0
+        packed = rows[1][0].callback_data
+        assert Callbacks.DefendantSelectionCallback.unpack(packed).defendant_index == 1
 
     @pytest.mark.asyncio
     async def test_prices_menu_lists_options_with_back_button(self, service, bot):
@@ -94,9 +96,16 @@ class TestAiogramMessageService(BaseTestGroup):
         ).option_index == 1
         assert rows[2][0].callback_data == "buy_options_back"
 
-    def test_callback_payload_fits_telegram_limit(self):
-        packed = Keyboards.defendant_selection([Speaker("а" * 20)])
-        assert len(packed.inline_keyboard[0][0].callback_data.encode()) <= 64
+    @pytest.mark.parametrize(
+        "name",
+        ["Александра Константиновна Иванова-Петрова", "Ivan: work", "а" * 200],
+    )
+    def test_any_speaker_name_fits_into_callback(self, name):
+        packed = Keyboards.defendant_selection([Speaker(name)])
+
+        button = packed.inline_keyboard[0][0]
+        assert button.text == name
+        assert len(button.callback_data.encode()) <= 64
 
 
 class TestAiogramContextService(BaseTestGroup):

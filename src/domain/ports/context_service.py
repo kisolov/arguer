@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABC
+from typing import List
 
-from src.domain.exceptions import ContextEmpty, UndefinedDefendant
+from src.domain.exceptions import ContextEmpty, UndefinedDefendant, UnknownDefendant
 from src.domain.models import Dialogue, Speaker, Argue
 
 
@@ -33,6 +34,15 @@ class ContextService(ABC):
 
     async def set_defendant(self, defendant: Speaker):
         await self.update(dict(defendant=defendant))
+
+    async def set_defendant_options(self, options: List[Speaker]):
+        await self.update(dict(defendant_options=options))
+
+    async def get_defendant_options(self) -> List[Speaker]:
+        try:
+            return await self.get("defendant_options")
+        except KeyError:
+            raise UnknownDefendant()
 
     async def set_processed(self, argue: Argue):
         await self.update(dict(processed=argue))

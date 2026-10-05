@@ -1,10 +1,14 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import BigInteger, DateTime, Double, Enum, ForeignKey, String, text
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Numeric, String, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from src.domain.models import TransactionCategory, TransactionStatus
+
+# Сумма в ✨ до сотых, как в домене (money)
+MONEY = Numeric(14, 2, asdecimal=True)
 
 
 def _enum(enum_cls):
@@ -26,7 +30,8 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
-    bal: Mapped[float] = mapped_column(Double, default=150.0)
+    # Деньги в DECIMAL: в существующей БД колонка меняется через sql/002_money_decimal.sql
+    bal: Mapped[Decimal] = mapped_column(MONEY, default=Decimal("150.00"))
 
 
 class Transaction(Base):
@@ -40,7 +45,7 @@ class Transaction(Base):
     user: Mapped[User] = relationship(lazy="raise")
     status: Mapped[TransactionStatus] = mapped_column(_enum(TransactionStatus))
     category: Mapped[TransactionCategory] = mapped_column(_enum(TransactionCategory))
-    amount: Mapped[float] = mapped_column(Double)
+    amount: Mapped[Decimal] = mapped_column(MONEY)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )

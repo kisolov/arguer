@@ -1,4 +1,5 @@
 import asyncio
+from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import select, update
@@ -62,7 +63,7 @@ class SqlUserRepository(SqlRepositoryAdapter[User, models.User], UserRepository)
         session.add(db_user)
         return db_user
 
-    async def change_balance(self, user_id: int, delta: float) -> User:
+    async def change_balance(self, user_id: int, delta: Decimal) -> User:
         async with self._write() as session:
             # Условный UPDATE: проверка и изменение баланса атомарны, снимок не читается
             changed = await session.execute(

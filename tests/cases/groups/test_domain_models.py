@@ -34,8 +34,10 @@ class TestDialogue(BaseTestGroup):
             ]
         )
 
-    def test_participants_are_unique(self, dialogue):
-        assert sorted(p.name for p in dialogue.partipitians) == ["a", "b"]
+    def test_participants_are_unique_and_sorted_by_name(self, dialogue):
+        dialogue.add_message(UnprocessedMessage(Speaker("0"), text="первый по имени"))
+
+        assert [p.name for p in dialogue.participants] == ["0", "a", "b"]
 
     def test_media_duration_sums_only_messages_with_media(self, dialogue):
         assert dialogue.media_duration == 10
@@ -56,7 +58,7 @@ class TestDialogue(BaseTestGroup):
 
         assert dialogue.media_duration == 0
         assert dialogue.total_symbols == 0
-        assert dialogue.partipitians == []
+        assert dialogue.participants == []
 
     def test_instances_do_not_share_message_list(self):
         first, second = Dialogue(), Dialogue()

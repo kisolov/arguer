@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, SecretStr
@@ -14,9 +15,10 @@ class BaseAppConfig(BaseSettings):
 class CostConfig(BaseAppConfig):
     """Конфиг стоимостных параметров"""
 
-    default_cost: float = Field(25.0, alias="COST_DEFAULT")
-    text_symbol_cost: float = Field(25.0 / 5000, alias="COST_TEXT_SYMBOL")
-    voice_second_cost: float = Field(25.0 / 60, alias="COST_VOICE_SECOND")
+    # Decimal: стоимость участвует в денежных расчётах, float давал бы ошибки округления
+    default_cost: Decimal = Field(Decimal(25), alias="COST_DEFAULT")
+    text_symbol_cost: Decimal = Field(Decimal(25) / 5000, alias="COST_TEXT_SYMBOL")
+    voice_second_cost: Decimal = Field(Decimal(25) / 60, alias="COST_VOICE_SECOND")
 
     model_config = SettingsConfigDict(
         env_prefix="COST_", env_file=".env", extra="ignore"
@@ -112,6 +114,8 @@ class AppConfig(BaseAppConfig):
     unprocessed_media_duration_limit: int = Field(
         ..., alias="APP_UNPROCESSED_MEDIA_DURATION_LIMIT"
     )
+    # Вся история спора уходит в модель; лимит держит запрос в её контексте
+    context_symbols_limit: int = Field(60000, alias="APP_CONTEXT_SYMBOLS_LIMIT")
     enable_test_messages: bool = Field(False, alias="APP_ENABLE_TEST_MESSAGES")
 
     model_config = SettingsConfigDict(env_prefix="APP_")

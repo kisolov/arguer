@@ -1,3 +1,4 @@
+from decimal import Decimal
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -12,7 +13,7 @@ class PaymentInfo:
 
 class PaymentGateway(ABC):
     @abstractmethod
-    async def create_payment(self, amount: float, description: str) -> PaymentInfo:
+    async def create_payment(self, amount: Decimal | int, description: str) -> PaymentInfo:
         pass
 
     @abstractmethod

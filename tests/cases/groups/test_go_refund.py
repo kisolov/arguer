@@ -157,9 +157,9 @@ class TestGoRefund(BaseTestGroup):
         states_at_charge = []
         charge = BillingService.charge_for_dialogue
 
-        async def spy(billing, user, dialogue):
+        async def spy(billing, *args):
             states_at_charge.append(session.context_service._current_state)
-            return await charge(billing, user, dialogue)
+            return await charge(billing, *args)
 
         with patch.object(BillingService, "charge_for_dialogue", spy):
             await go_uc.execute()

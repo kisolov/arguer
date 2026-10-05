@@ -3,8 +3,8 @@ import pytest
 from src.application import SelectDefendant, SendDefendantSelection
 from src.application.uc.fetch_defendant import FetchDefendant
 from src.application.uc.fetch_dialogue import FetchDialogue
-from src.domain.exceptions import ContextEmpty, UndefinedDefendant
-from src.domain.models import Speaker
+from src.domain.exceptions import ContextEmpty, UndefinedDefendant, UnknownDefendant
+from src.domain.models import Dialogue, Speaker, UnprocessedMessage
 from src.infrastructure import Callbacks
 from tests.cases.base import BaseTestGroup
 from tests.utils.factories import EventContextFactory
@@ -28,14 +28,17 @@ class TestDefendantSelection(BaseTestGroup):
         with pytest.raises(ContextEmpty):
             await SendDefendantSelection(session).execute()
 
+    def press(self, session, index):
+        session.event = EventContextFactory(
+            user=session.user,
+            data=Callbacks.DefendantSelectionCallback(defendant_index=index),
+        )
+
     @pytest.mark.asyncio
     async def test_choice_sets_defendant_and_leaves_selection_state(self, session):
         await self.add_messages(session, 4)
         await SendDefendantSelection(session).execute()
-        session.event = EventContextFactory(
-            user=session.user,
-            data=Callbacks.DefendantSelectionCallback(defendant_name="человек 1"),
-        )
+        self.press(session, 1)
 
         await SelectDefendant(session).execute()
 
@@ -44,18 +47,53 @@ class TestDefendantSelection(BaseTestGroup):
         assert len(session.message_service.get_deleted_messages()) == 1
 
     @pytest.mark.asyncio
-    async def test_choice_of_unknown_participant_is_rejected(self, session):
+    async def test_button_keeps_meaning_after_new_participant_appears(self, session):
         await self.add_messages(session, 4)
-        session.event = EventContextFactory(
-            user=session.user,
-            data=Callbacks.DefendantSelectionCallback(defendant_name="призрак"),
-        )
+        await SendDefendantSelection(session).execute()
+        _, offered = session.message_service.send_defendant_selection.await_args.args
+        # Пока меню открыто, пришла пересылка от участника, чьё имя встанет первым
+        await self.forward(session, "Аааа", "новое сообщение")
+        self.press(session, 1)
 
-        with pytest.raises(AssertionError):
+        await SelectDefendant(session).execute()
+
+        assert await session.context_service.get_defendant() == offered[1]
+
+    @pytest.mark.asyncio
+    async def test_choice_outside_menu_is_rejected(self, session):
+        await self.add_messages(session, 4)
+        await SendDefendantSelection(session).execute()
+        self.press(session, 7)
+
+        with pytest.raises(UnknownDefendant):
             await SelectDefendant(session).execute()
 
         with pytest.raises(UndefinedDefendant):
             await session.context_service.get_defendant()
+
+    @pytest.mark.asyncio
+    async def test_choice_without_menu_is_rejected(self, session):
+        await self.add_messages(session, 4)
+        self.press(session, 0)
+
+        with pytest.raises(UnknownDefendant):
+            await SelectDefendant(session).execute()
+
+    @pytest.mark.asyncio
+    async def test_participant_gone_after_clear_is_rejected(self, session):
+        await self.add_messages(session, 4)
+        await SendDefendantSelection(session).execute()
+        await session.context_service.set_unprocessed(Dialogue())
+        await self.forward(session, "кто-то другой", "привет")
+        self.press(session, 0)
+
+        with pytest.raises(UnknownDefendant):
+            await SelectDefendant(session).execute()
+
+    async def forward(self, session, speaker, text):
+        dialogue = await session.context_service.get_unprocessed()
+        dialogue.add_message(UnprocessedMessage(Speaker(speaker), text=text))
+        await session.context_service.set_unprocessed(dialogue)
 
 
 class TestFetchers(BaseTestGroup):

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from copy import deepcopy
 from typing import Dict, TypeVar, Generic, List
 from src.domain.exceptions import InsufficientFunds, RecordNotFound
@@ -58,7 +59,7 @@ class InMemoryUserRepository(InMemoryRepository[User], UserRepository):
         except RecordNotFound:
             return await self.store(user)
 
-    async def change_balance(self, user_id: int, delta: float) -> User:
+    async def change_balance(self, user_id: int, delta: Decimal) -> User:
         stored = self._storage.get(user_id)
         if stored is None:
             raise RecordNotFound(f"User[{user_id}]")

@@ -1,3 +1,4 @@
+from .money import money, CENT
 from .user import User
 from .argue import Argue
 from .reasoning import Reasoning
