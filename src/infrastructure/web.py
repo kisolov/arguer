@@ -1,3 +1,4 @@
+import asyncio
 import io
 import aiohttp
 from pydub import AudioSegment
@@ -57,6 +58,13 @@ class WebMediaHandler(MediaHandler):
 
     @staticmethod
     async def _convert_video_to_audio_bytes(video_bytes: bytes) -> bytes:
+        # ffmpeg работает синхронно и долго: в event loop он остановил бы всех
+        return await asyncio.to_thread(
+            WebMediaHandler._convert_video_sync, video_bytes
+        )
+
+    @staticmethod
+    def _convert_video_sync(video_bytes: bytes) -> bytes:
         try:
             with io.BytesIO(video_bytes) as video_stream:
                 audio = AudioSegment.from_file(video_stream)

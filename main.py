@@ -1,5 +1,4 @@
 import asyncio
-from datetime import timedelta
 from aiogram import Dispatcher, Bot
 from dependency_injector.wiring import inject, Provide
 from di import container, Container
@@ -27,7 +26,7 @@ def refresh_token_and_schedule(
 
     task()
 
-    scheduler.schedule_every(timedelta(hours=1), task)
+    scheduler.schedule_every(RefreshToken.INTERVAL, task)
 
 
 @inject

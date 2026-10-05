@@ -16,7 +16,9 @@ class TokenService:
         return f"{self._key_prefix}:{token_id}"
 
     def get_token(self, token_id: str = "default") -> Optional[str]:
-        return self._storage.get(self._get_full_key(token_id)).decode("utf-8")
+        """None, если токена нет: истёк TTL или его ещё не выпускали."""
+        value = self._storage.get(self._get_full_key(token_id))
+        return value.decode("utf-8") if value is not None else None
 
     def save_token(self, token: Token, token_id: str = "default") -> None:
         self._storage.set(

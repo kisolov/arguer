@@ -95,11 +95,11 @@ class TestYandexSpeechKit(BaseTestGroup):
 
     @pytest.mark.asyncio
     async def test_audio_is_uploaded_and_public_uri_returned(self, kit, bucket):
-        uri = await kit._prepare_and_upload_audio(b"data", "ogg")
+        key = await kit._upload_audio(b"data", "ogg")
 
-        key = bucket.upload_bytes.await_args.args[1]
+        assert bucket.upload_bytes.await_args.args[1] == key
         assert key.startswith("speechkit/") and key.endswith(".ogg")
-        assert uri == f"https://storage.yandexcloud.net/test/{key}"
+        assert kit._public_uri(key) == f"https://storage.yandexcloud.net/test/{key}"
 
     @pytest.mark.asyncio
     async def test_recognize_joins_recognized_chunks(self, kit):

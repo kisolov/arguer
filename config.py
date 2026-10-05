@@ -78,8 +78,11 @@ class GenAPIConfig(BaseAppConfig):
     default_timeout_seconds: int = Field(
         default=30, alias="GENAPI_DEFAULT_TIMEOUT_SECONDS"
     )
-    max_retries: int = Field(default=3)
-    enable_compression: bool = Field(default=True)
+    # Повторы только на сетевые сбои, 429 и 5xx: ошибку запроса повтор не исправит
+    max_retries: int = Field(default=2, alias="GENAPI_MAX_RETRIES")
+    retry_backoff_seconds: float = Field(
+        default=1.0, alias="GENAPI_RETRY_BACKOFF_SECONDS"
+    )
 
     def model_post_init(self, __context: Any) -> None:
         """Нормализует base_url"""

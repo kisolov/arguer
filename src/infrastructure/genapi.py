@@ -1,4 +1,5 @@
 import asyncio
+import time
 from typing import Any, Dict, Optional, Sequence
 
 import requests
@@ -15,6 +16,11 @@ class GenAPIError(LanguageModelError):
     def __init__(self, message: str, status_code: Optional[int] = None):
         super().__init__(message)
         self.status_code = status_code
+
+
+def _is_transient(error: GenAPIError) -> bool:
+    """Сеть, таймаут (status_code нет), перегрузка или сбой сервера."""
+    return error.status_code is None or error.status_code == 429 or error.status_code >= 500
 
 
 class GenAPIClient(LanguageModelInterface):
@@ -37,6 +43,18 @@ class GenAPIClient(LanguageModelInterface):
         return self._extract_content(data)
 
     def _post(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Выполняется в потоке, поэтому пауза между попытками — обычный sleep."""
+        attempt = 0
+        while True:
+            try:
+                return self._post_once(endpoint, payload)
+            except GenAPIError as error:
+                if attempt >= self.settings.max_retries or not _is_transient(error):
+                    raise
+                time.sleep(self.settings.retry_backoff_seconds * 2**attempt)
+                attempt += 1
+
+    def _post_once(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self.settings.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
 
         try:

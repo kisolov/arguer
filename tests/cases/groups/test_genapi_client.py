@@ -24,6 +24,10 @@ class TestGenAPIClient(BaseTestGroup):
     def client(self):
         client = self.container.adapters.genapi_client()
         client._session = Mock()
+        # Копия настроек: синглтон контейнера не меняется для других тестов
+        client.settings = client.settings.model_copy(
+            update={"retry_backoff_seconds": 0, "max_retries": 2}
+        )
         return client
 
     @pytest.mark.asyncio
@@ -74,6 +78,42 @@ class TestGenAPIClient(BaseTestGroup):
 
         with pytest.raises(LanguageModelError):
             await client.complete([ChatMessage("user", "привет")])
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            requests.exceptions.ConnectionError("down"),
+            requests.exceptions.Timeout("slow"),
+            http_response(status_code=503, text="busy"),
+            http_response(status_code=429, text="rate"),
+        ],
+    )
+    async def test_transient_failure_is_retried(self, client, failure):
+        ok = http_response({"response": [{"message": {"content": "ответ"}}]})
+        # side_effect бросает исключения из списка и возвращает остальное
+        client._session.post.side_effect = [failure, ok]
+
+        assert await client.complete([ChatMessage("user", "привет")]) == "ответ"
+        assert client._session.post.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_retries_stop_after_limit(self, client):
+        client._session.post.return_value = http_response(status_code=500)
+
+        with pytest.raises(GenAPIError):
+            await client.complete([ChatMessage("user", "привет")])
+
+        assert client._session.post.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_client_error_is_not_retried(self, client):
+        client._session.post.return_value = http_response(status_code=400, text="bad")
+
+        with pytest.raises(GenAPIError):
+            await client.complete([ChatMessage("user", "привет")])
+
+        assert client._session.post.call_count == 1
 
     @pytest.mark.asyncio
     async def test_error_field_in_response_is_language_model_error(self, client):
