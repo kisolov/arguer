@@ -35,22 +35,26 @@ Telegram → aiogram Dispatcher
        └ route ловит → SendDefendantSelection: состояние defendant_selection + кнопки с именами
             кнопка → SelectDefendant (проверка, что имя среди участников; удаляет меню;
                      ⇒ FSM "defendant"; сброс состояния) → Go с шага 1
-  3. ChargeForUsage         cost = default + секунды·k + символы·k
-       BillingService.charge_for_dialogue → UnitOfWork: списание + запись транзакции (шаг 3а)
+  3. запомнить processed_before (для восстановления)
+  4. состояние processing   снимается в finally при любом исходе (шаг 12)
+  5. ChargeForUsage         cost = default + секунды·k + символы·k
+       BillingService.charge_for_dialogue → UnitOfWork: списание + запись транзакции (шаг 5а)
        MessageService.notify_charge
-  4. состояние processing
-  5. сообщение «Идёт обработка...»
-  6. ProcessUnprocessed     ArgueService.create_from_dialogue (голос → текст параллельно)
+  6. сообщение «Идёт обработка...»
+  7. ProcessUnprocessed     ArgueService.create_from_dialogue (голос → текст параллельно)
                             clear_data; если был processed_before — склейка Argue
                             ⇒ FSM "processed", "defendant"
-  7. ProcessArgue           LLMDisputeResolver.resolve → GenAPI
-  8. finally: удалить «Идёт обработка...»
-  9. HandleResolution       отправить ответ; Argue += реплика assistant ⇒ FSM "processed"
- 10. ShowContextInfo        размер контекста
- 11. сброс состояния
+  8. ProcessArgue           LLMDisputeResolver.resolve → GenAPI
+  9. finally: удалить «Идёт обработка...»
+ 10. HandleResolution       отправить ответ; Argue += реплика assistant ⇒ FSM "processed"
+     сбой на шагах 6–10:    FSM ⇐ unprocessed, defendant, processed_before;
+                            BillingService.refund ⇒ transactions (REFUND, +cost);
+                            MessageService.notify_refund; исключение наружу
+ 11. ShowContextInfo        размер контекста
+ 12. finally: сброс состояния
 ```
 
-Шаг 3а, внутри одного `async with unit_of_work()`:
+Шаг 5а, внутри одного `async with unit_of_work()`:
 
 ```
 users.change_balance(user.id, -cost)    условный UPDATE, при нехватке — InsufficientFunds
@@ -66,9 +70,11 @@ commit (выход без исключения) | rollback (любое искл�
 кнопка «Пополнить» → SendPricesMenu: BuyOptionsRepository.get_all → меню пакетов
 кнопка пакета      → SendPaymentLink
     BuyOptionsRepository.get(index)
+    BillingService.open_top_up ⇒ transactions (PENDING, uuid пуст)
     PaymentGateway.create_payment(price, description)        → YooKassa
-    BillingService.record_top_up ⇒ transactions (PENDING, uuid = id платежа)
-    ссылка на оплату пользователю
+        ошибка → BillingService.cancel_transaction (CANCELED), исключение наружу
+    BillingService.attach_payment ⇒ transactions (uuid = id платежа)
+    ссылка на оплату пользователю (только после привязки uuid)
 пользователь платит вне бота
 кнопка 🔄 (/bal → update) → RefreshBalance
     TransactionRepository.get_pending_transactions_for(user.id)

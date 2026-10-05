@@ -14,7 +14,7 @@
 |---|---|---|---|
 | Telegram Bot API | приём апдейтов, отправка сообщений | `MessageService`, `ContextService`, `PopupService` | [infrastructure/aiogram](../../src/infrastructure/aiogram/) |
 | MySQL 8 | пользователи и транзакции | `UserRepository`, `TransactionRepository`, `UnitOfWork` | [infrastructure/db](../../src/infrastructure/db/) |
-| Redis 7 | кэш IAM-токена Yandex Cloud | `KeyValueStorage` | [redis.py](../../src/infrastructure/redis.py) |
+| Redis 7 | кэш IAM-токена Yandex Cloud; FSM aiogram (контекст диалога и состояния) | `KeyValueStorage`, `RedisStorage` aiogram | [redis.py](../../src/infrastructure/redis.py) |
 | GenAPI | языковая модель | `LanguageModelInterface` | [genapi.py](../../src/infrastructure/genapi.py) |
 | Yandex SpeechKit + Object Storage | распознавание голоса | `SpeechRecognitionInterface` | [yandex/s3/speechkit.py](../../src/infrastructure/yandex/s3/speechkit.py) |
 | Yandex Cloud CLI (`yc`) | выпуск IAM-токена | `TokenProvider` | [yandex/cloud_cli.py](../../src/infrastructure/yandex/cloud_cli.py) |

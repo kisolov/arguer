@@ -1,5 +1,6 @@
 import aiogram
 from aiogram.client.default import DefaultBotProperties
+from aiogram.fsm.storage.memory import SimpleEventIsolation
 from dependency_injector import containers, providers
 from redis import Redis
 
@@ -50,6 +51,7 @@ from src.infrastructure import (
     SqlTransactionRepository,
     SqlUnitOfWork,
     YooKassaGateway,
+    create_fsm_storage,
 )
 from src.infrastructure.memory import InMemoryBuyOptionsRepository
 
@@ -205,7 +207,18 @@ class Container(containers.DeclarativeContainer):
         ),
         default=DefaultBotProperties(parse_mode="html"),
     )
-    dp = providers.Singleton(aiogram.Dispatcher)
+    fsm_storage = providers.Singleton(
+        create_fsm_storage,
+        host=config.redis_config.provided.host,
+        port=config.redis_config.provided.port,
+    )
+    # Апдейты одного пользователя обрабатываются по очереди: контекст в Redis
+    # обновляется чтением и записью, а параллельные /go списывали бы дважды
+    dp = providers.Singleton(
+        aiogram.Dispatcher,
+        storage=fsm_storage,
+        events_isolation=providers.Singleton(SimpleEventIsolation),
+    )
 
 
 container = Container()

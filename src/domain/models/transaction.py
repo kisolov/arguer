@@ -14,6 +14,7 @@ class TransactionStatus(enum.Enum):
 class TransactionCategory(enum.Enum):
     TOP_UP = "top_up"
     USAGE = "usage"
+    REFUND = "refund"
 
 @dataclass
 class Transaction:

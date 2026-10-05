@@ -61,7 +61,7 @@ Telegram-бот на aiogram 3. Слои: `endpoint → usecase → service → 
 | [BuyOptionsRepository](../../../src/domain/ports/repositories/buy_options.py) | [InMemoryBuyOptionsRepository](../../../src/infrastructure/memory.py) | нет: четыре пакета зашиты в код |
 | [PaymentGateway](../../../src/domain/ports/payment_gateway.py) | [YooKassaGateway](../../../src/infrastructure/yookassa.py) | YooKassa |
 | [MessageService](../../../src/domain/ports/message_service.py) | [AiogramMessageService](../../../src/infrastructure/aiogram/message_service.py) | Telegram; тексты — `Texts` в порте, клавиатуры — в адаптере |
-| [ContextService](../../../src/domain/ports/context_service.py) | [AiogramContextService](../../../src/infrastructure/aiogram/context_service.py) | FSM aiogram: контекст диалога и состояние |
+| [ContextService](../../../src/domain/ports/context_service.py) | [AiogramContextService](../../../src/infrastructure/aiogram/context_service.py) | FSM aiogram в Redis ([fsm_storage.py](../../../src/infrastructure/aiogram/fsm_storage.py)): контекст диалога и состояние |
 | [PopupService](../../../src/domain/ports/popup_service.py) | [AiogramPopupService](../../../src/infrastructure/aiogram/popup_service.py) | `answerCallbackQuery` |
 
 `MessageService`, `ContextService`, `PopupService` создаются на каждый апдейт в `SessionMiddleware`, а не через DI-контейнер.
@@ -90,7 +90,7 @@ Telegram-бот на aiogram 3. Слои: `endpoint → usecase → service → 
 | `/go` | [Go](../../../src/application/uc/go.py); при `UndefinedDefendant` — [SendDefendantSelection](../../../src/application/uc/send_defendant_selection.py) | — |
 | пересланное сообщение | [AddMessageToUnprocessed](../../../src/application/uc/add_reasoning_to_unprocessed.py) | `forward_from` или `forward_sender_name` |
 | `текст (id)` | `AddTestMessageToUnprocessed` | только при `APP_ENABLE_TEST_MESSAGES=true` |
-| любое сообщение | пустой обработчик `processing_input_protection` (приоритет 100) | состояние `processing` |
+| любое сообщение, кроме `/ctx`, `/start`, `/clear` | пустой обработчик `processing_input_protection` | состояние `processing` |
 | кнопка выбора подзащитного | [SelectDefendant](../../../src/application/uc/select_defendant.py), затем `Go` | состояние `defendant_selection` |
 | кнопка «Пополнить» (`top_up`) | [SendPricesMenu](../../../src/application/uc/send_prices_menu.py) | — |
 | кнопка «Назад» (`buy_options_back`) | `SendBalanceMenu` в существующем сообщении | — |

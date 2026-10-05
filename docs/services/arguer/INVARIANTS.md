@@ -8,7 +8,7 @@
 |---|---|
 | Баланс меняется приращением в БД: `UPDATE users SET bal = bal + :delta WHERE id = :id AND bal + :delta >= 0`. Снимок баланса из памяти в БД не пишется, поэтому параллельные начисления не теряются | [user.py](../../../src/infrastructure/db/repositories/user.py) `change_balance` |
 | Баланс не может стать отрицательным. Нет строки → `RecordNotFound`, есть, но не хватает → `InsufficientFunds` | там же |
-| Списание — `amount < 0`, пополнение — `amount > 0`; `BillingService` знак не проверяет, `record_top_up` берёт `tokens_amount` из пакета | [billing_service.py](../../../src/domain/operations/services/billing_service.py) |
+| Списание — `amount < 0`, пополнение и возврат — `amount > 0`; `BillingService` знак не проверяет, `open_top_up` берёт `tokens_amount` из пакета. Возврат (`REFUND`) — отдельная транзакция на сумму списания, само списание не меняется | [billing_service.py](../../../src/domain/operations/services/billing_service.py) |
 | Новая транзакция (`id is None`) применяется как `COMPLETED` сразу: баланс и запись — в одном UnitOfWork, откат затрагивает обе | `_apply_new` |
 | Существующая `PENDING` применяется через compare-and-set `UPDATE ... SET status = :s WHERE id = :id AND status = 'pending'`; побеждает ровно один вызов (`rowcount == 1`), остальные баланс не трогают | [transaction.py](../../../src/infrastructure/db/repositories/transaction.py) `transition_pending` |
 | Переданные объекты (`transaction`, `transaction.user`) обновляются только после успешного коммита | `_apply_new`, `_apply_pending` |
@@ -32,7 +32,7 @@
 | Правило | Где |
 |---|---|
 | `telegram_id` уникален (индекс `ix_users_telegram_id`). В БД, созданной до индекса, он появляется только вручную: [sql/001_users_unique_telegram_id.sql](../../../sql/001_users_unique_telegram_id.sql). `create_all` индекс в существующую таблицу не добавляет | [models.py](../../../src/infrastructure/db/models.py) |
-| `get_or_create` защищён двумя слоями: `asyncio.Lock` внутри процесса (действует и без индекса) и уникальный индекс между процессами (проигравший ловит `IntegrityError` и перечитывает запись) | `SqlUserRepository.get_or_create` |
+| `get_or_create` защищён двумя слоями: `asyncio.Lock` внутри процесса (действует и без индекса) и уникальный индекс между процессами (проигравший ловит `IntegrityError` и перечитывает запись). Уже зарегистрированный пользователь читается без замка, замок берётся только на регистрацию | `SqlUserRepository.get_or_create` |
 | Поиск по `telegram_id` берёт запись с наименьшим `id` (`ORDER BY id LIMIT 1`): при унаследованных дублях всегда выбирается самая старая | `SqlUserRepository._get` |
 | Пользователь регистрируется по `chat.id`. В личном чате он равен id пользователя; в группе это был бы id группы, но роуты рассчитаны на личный чат | [registration_middleware.py](../../../src/presentation/aiogram/registration_middleware.py) |
 | Стартовый баланс — 150✨: значение по умолчанию в `User.bal` и `models.User.bal`; `_create` берёт `bal` из доменного объекта | [user.py](../../../src/domain/models/user.py) |
@@ -54,10 +54,12 @@
 | Правило | Где |
 |---|---|
 | Контекст хранится в FSM aiogram: ключи `unprocessed` (Dialogue), `defendant` (Speaker), `processed` (Argue) | [context_service.py](../../../src/infrastructure/aiogram/context_service.py) |
-| Хранилище FSM — стандартное для `aiogram.Dispatcher`, то есть **память процесса**: контекст и состояния пропадают при перезапуске. Redis для FSM не используется | [di.py](../../../di.py) `dp` |
+| Хранилище FSM — Redis (`aiogram` `RedisStorage`, асинхронный клиент): контекст и состояния переживают перезапуск. Значения сериализуются pickle + base64, потому что в контексте лежат доменные объекты | [fsm_storage.py](../../../src/infrastructure/aiogram/fsm_storage.py), [di.py](../../../di.py) `dp` |
+| Апдейты одного пользователя обрабатываются по очереди (`SimpleEventIsolation`): чтение и запись контекста в Redis не перемежаются, повторный `/go` не начинается, пока идёт первый | [di.py](../../../di.py) `dp` |
 | `get` считает «пусто» любое ложное значение (`if not desired`): пустая коллекция или `None` → `KeyError` → `ContextEmpty`/`UndefinedDefendant` | `AiogramContextService.get` |
-| Состояния: `processing` (идёт `/go`), `defendant_selection` (ждём выбор кнопкой). Обработчик `processing_input_protection` с приоритетом 100 глотает **любое** сообщение в `processing`, включая `/clear` | [routes.py](../../../src/presentation/aiogram/routes.py) |
-| Порядок обработчиков имеет значение: `/ctx` зарегистрирован до защиты и работает в `processing`, остальные команды — нет | routes.py |
+| Состояния: `processing` (идёт `/go`), `defendant_selection` (ждём выбор кнопкой). Обработчик `processing_input_protection` глотает в `processing` все сообщения, для которых не нашлось обработчика выше | [routes.py](../../../src/presentation/aiogram/routes.py) |
+| Порядок обработчиков имеет значение, aiogram проверяет их в порядке регистрации: `/ctx`, `/start` и `/clear` зарегистрированы до защиты и работают в `processing`, остальные команды и пересылки — нет | routes.py |
+| `/go` ставит `processing` до списания и снимает его в `finally` при любом исходе | [go.py](../../../src/application/uc/go.py) |
 | Пересланное сообщение без имени отправителя (скрытый профиль без `forward_sender_name`) получает имя `hidden`; сообщения всех скрытых сливаются в одного говорящего | [unprocessed_message_factory.py](../../../src/domain/operations/factories/unprocessed_message_factory.py) |
 | Сообщение без текста и без голоса/кружка → `ValueError`, а не бизнес-ошибка: попадёт в общий обработчик как «Неожиданная ошибка» | там же |
 | Голос и кружок берутся из `voice`/`video_note`; аудио из видео-файла (`mp4`) конвертируется в OGG/Opus через pydub и ffmpeg | [mapping_middleware.py](../../../src/presentation/aiogram/mapping_middleware.py), [web.py](../../../src/infrastructure/web.py) |
@@ -84,4 +86,4 @@
 
 ## Несколько экземпляров бота
 
-Один процесс — единственная поддерживаемая конфигурация. Состояние FSM в памяти не делится между копиями, замок регистрации локален процессу. Финансовые операции (`change_balance`, `transition_pending`) атомарны на уровне БД и от числа процессов не зависят.
+Один процесс — единственная поддерживаемая конфигурация. Состояние FSM в Redis общее, но очередь апдейтов пользователя (`SimpleEventIsolation`) и замок регистрации локальны процессу. Финансовые операции (`change_balance`, `transition_pending`) атомарны на уровне БД и от числа процессов не зависят.

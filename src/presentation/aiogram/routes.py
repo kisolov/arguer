@@ -59,25 +59,28 @@ async def show_ctx(session: Session):
     await ShowContextInfo(session).execute()
 
 
-@router.message(filters.StateFilter(States.processing), flags={"priority": 100})
-async def processing_input_protection(session: Session):
-    pass
-
-
 @router.message(filters.Command("start"))
 async def start(session: Session):
     await SendInstructions(session).execute()
+
+
+# /start и /clear зарегистрированы выше защиты: состояние живёт в Redis, и если процесс
+# упал посреди /go, пользователь сбрасывает зависшее processing сам
+@router.message(filters.Command("clear"))
+async def clear(session: Session):
+    await ClearContext(session).execute()
+
+
+# aiogram проверяет обработчики в порядке регистрации: всё, что ниже, в processing не попадает
+@router.message(filters.StateFilter(States.processing))
+async def processing_input_protection(session: Session):
+    pass
 
 
 @router.message(filters.Command("bal"))
 @with_deps("core.cost_calculator")
 async def bal(session: Session, cost_calculator):
     await SendBalanceMenu(session, formula=cost_calculator.get_formula_text()).execute()
-
-
-@router.message(filters.Command("clear"))
-async def clear(session: Session):
-    await ClearContext(session).execute()
 
 
 @router.message(filters.Command("go"))

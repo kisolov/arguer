@@ -23,6 +23,12 @@ class SqlUserRepository(SqlRepositoryAdapter[User, models.User], UserRepository)
         self._create_lock = asyncio.Lock()
 
     async def get_or_create(self, user: User) -> User:
+        # Почти каждый апдейт — от уже зарегистрированного: читаем без замка,
+        # иначе все апдейты всех пользователей шли бы через него по одному
+        try:
+            return await self.get(user)
+        except RecordNotFound:
+            pass
         async with self._create_lock:
             try:
                 return await self.get(user)

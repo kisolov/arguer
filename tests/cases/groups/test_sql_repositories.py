@@ -278,6 +278,20 @@ class TestSqlUserRepository(BaseTestGroup):
         assert len({u.id for u in registered}) == 1
         assert len(rows) == 1
 
+    @pytest.mark.asyncio
+    async def test_known_user_does_not_wait_for_registration_lock(
+        self, file_database
+    ):
+        # Регистрация нового пользователя не задерживает апдейты остальных
+        users = SqlUserRepository(file_database)
+        known = await users.store(User(telegram_id=556, bal=10))
+
+        async with users._create_lock:
+            async with asyncio.timeout(1):
+                got = await users.get_or_create(User(telegram_id=556))
+
+        assert got.id == known.id
+
 
 class TestSqlTransactionRepository(BaseTestGroup):
     @pytest.fixture

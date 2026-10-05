@@ -155,3 +155,34 @@ class TestBillingOverSql(BaseTestGroup):
         stored = await transactions.get(pending)
         assert stored.status is TransactionStatus.COMPLETED
         assert (await users.get(user)).bal == 250
+
+    @pytest.mark.asyncio
+    async def test_refund_returns_charge_as_separate_record(
+        self, billing, users, database, user
+    ):
+        charge = Transaction(user=user, category=TransactionCategory.USAGE, amount=-50)
+        await billing.apply_transaction(charge)
+
+        refund = await billing.refund(charge)
+
+        assert (await users.get(user)).bal == 150
+        async with SqlUnitOfWork(database) as uow:
+            stored = await uow.transactions.get(refund)
+        assert (stored.category, stored.amount, stored.status) == (
+            TransactionCategory.REFUND,
+            50,
+            TransactionStatus.COMPLETED,
+        )
+
+    @pytest.mark.asyncio
+    async def test_unattached_top_up_is_not_checked_until_payment_attached(
+        self, billing, transactions, user
+    ):
+        opened = await billing.open_top_up(user, 100)
+        [pending] = await transactions.get_pending_transactions_for(user.id)
+        assert pending.uuid is None
+
+        await billing.attach_payment(opened, "pay-a")
+
+        [pending] = await transactions.get_pending_transactions_for(user.id)
+        assert (pending.id, pending.uuid, pending.amount) == (opened.id, "pay-a", 100)

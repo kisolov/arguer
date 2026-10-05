@@ -32,18 +32,46 @@ class BillingService:
 
         return self.cost_calculator.calculate_cost(voice_seconds, text_symbols)
 
-    async def charge_for_dialogue(self, user: User, dialogue: Dialogue):
+    async def charge_for_dialogue(self, user: User, dialogue: Dialogue) -> Transaction:
         cost = self.calculate_dialogue_cost(dialogue)
 
         transaction = self._create_transaction(
             user, -cost, TransactionCategory.USAGE, TransactionStatus.COMPLETED
         )
         await self.apply_transaction(transaction)
+        return transaction
+
+    async def refund(self, charge: Transaction) -> Transaction:
+        """Возвращает списанное за запрос, который не был обработан.
+
+        Возврат — отдельная транзакция, списание остаётся в истории как есть.
+        """
+        refund = self._create_transaction(
+            charge.user,
+            -charge.amount,
+            TransactionCategory.REFUND,
+            TransactionStatus.COMPLETED,
+        )
+        await self.apply_transaction(refund)
+        return refund
 
     async def record_top_up(self, user: User, amount: float, uuid: str):
         transaction = self._create_transaction(
             user, amount, category=TransactionCategory.TOP_UP, uuid=uuid
         )
+        await self.transaction_repository.store(transaction)
+
+    async def open_top_up(self, user: User, amount: float) -> Transaction:
+        """Записывает пополнение до создания платежа: оплата не может пройти без записи.
+
+        Пока платёж не привязан (uuid пуст), проверка баланса транзакцию пропускает.
+        """
+        return await self.transaction_repository.store(
+            self._create_transaction(user, amount, TransactionCategory.TOP_UP)
+        )
+
+    async def attach_payment(self, transaction: Transaction, payment_uuid: str):
+        transaction.uuid = payment_uuid
         await self.transaction_repository.store(transaction)
 
     def _create_transaction(

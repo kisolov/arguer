@@ -21,15 +21,25 @@ class SendPaymentLink(SessionRelatedUseCase):
         self.billing_service = billing_service
 
     async def execute(self):
+        """Ссылка уходит пользователю, только когда платёж записан и привязан к транзакции.
+
+        Иначе можно было бы оплатить платёж, о котором не знает БД, и баланс бы
+        не пополнился. Без ссылки неоплаченный платёж просто истекает в ЮKassa.
+        """
         buy_option = await self.buy_options_repository.get(
             self.session.event.data.option_index
         )
-        payment = await self.payment_gateway.create_payment(
-            buy_option.price, buy_option.description
+        transaction = await self.billing_service.open_top_up(
+            self.session.user, buy_option.tokens_amount
         )
-        await self.billing_service.record_top_up(
-            self.session.user, buy_option.tokens_amount, payment.payment_uuid
-        )
+        try:
+            payment = await self.payment_gateway.create_payment(
+                buy_option.price, buy_option.description
+            )
+        except Exception:
+            await self.billing_service.cancel_transaction(transaction)
+            raise
+        await self.billing_service.attach_payment(transaction, payment.payment_uuid)
 
         await self.session.message_service.send_payment_link(
             MessageContext(self.session.user, self.session.event.event_message_id),

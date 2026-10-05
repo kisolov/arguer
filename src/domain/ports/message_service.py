@@ -13,6 +13,7 @@ class Texts:
     )
     BALANCE_INFO = "На балансе <b>{balance:.2f}✨</b>\n\nЦена запроса рассчитывается по формуле <b>{formula}</b>"
     CHARGE_NOTIFICATION = "<b>{amount:.2f}✨</b>"
+    REFUND_NOTIFICATION = "Запрос не обработан, <b>{amount:.2f}✨</b> возвращены на баланс"
     CONTEXT_INFO = (
         "Контекст <b>{context_symbols} символов, {media_duration} секунд медиа.</b>\n\n"
         "Можно продолжить пересылать сообщения в этот контекст или написать /clear и начать сначала"
@@ -49,6 +50,11 @@ class MessageService(ABC):
     async def notify_charge(self, ctx: MessageContext, amount: float):
         return await self._send_message(
             ctx, Texts.CHARGE_NOTIFICATION.format(amount=amount)
+        )
+
+    async def notify_refund(self, ctx: MessageContext, amount: float):
+        return await self._send_message(
+            ctx, Texts.REFUND_NOTIFICATION.format(amount=amount)
         )
 
     async def send_resolution(self, ctx: MessageContext, resolution: str):
