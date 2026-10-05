@@ -24,7 +24,7 @@ Telegram → aiogram Dispatcher
       Dialogue из FSM (нет — новый) → проверка лимитов → add_message ⇒ FSM data["unprocessed"]
 ```
 
-Лимиты из `AppConfig`: число сообщений и суммарная длительность медиа. Превышение — `MessagesLimitExceeded` / `MediaLimitExceeded`, сообщение не добавляется.
+Лимиты из `AppConfig`: число сообщений, суммарная длительность медиа и текст всего спора (`processed` + `unprocessed` + новое сообщение, `APP_CONTEXT_SYMBOLS_LIMIT`). Превышение — `MessagesLimitExceeded` / `MediaLimitExceeded` / `ContextLimitExceeded`, сообщение не добавляется.
 
 ## 3. /go — основной сценарий
 
@@ -32,12 +32,15 @@ Telegram → aiogram Dispatcher
 /go → Go
   1. FetchDialogue          нет "unprocessed" → ContextEmpty (ошибка пользователю)
   2. FetchDefendant         нет "defendant" → UndefinedDefendant
-       └ route ловит → SendDefendantSelection: состояние defendant_selection + кнопки с именами
-            кнопка → SelectDefendant (проверка, что имя среди участников; удаляет меню;
+       └ route ловит → SendDefendantSelection: ⇒ FSM "defendant_options" (участники по имени);
+                       состояние defendant_selection + кнопки с номерами вариантов
+            кнопка → SelectDefendant (номер → defendant_options; вариант должен быть среди
+                     участников, иначе UnknownDefendant; удаляет меню;
                      ⇒ FSM "defendant"; сброс состояния) → Go с шага 1
   3. запомнить processed_before (для восстановления)
   4. состояние processing   снимается в finally при любом исходе (шаг 12)
-  5. ChargeForUsage         cost = default + секунды·k + символы·k
+  5. ChargeForUsage         cost = default + секунды·k + (символы новых + символы processed_before)·k,
+                            Decimal, округление до сотых
        BillingService.charge_for_dialogue → UnitOfWork: списание + запись транзакции (шаг 5а)
        MessageService.notify_charge
   6. сообщение «Идёт обработка...»
@@ -102,6 +105,8 @@ commit
 ```
 main: RefreshToken(YCCLIWrapper, TokenService).execute() — синхронно, до polling
    yc iam create-token → Token(value, 3600) → TokenService.save_token ⇒ Redis "yandex_iam:default", TTL 3600
-CronScheduler: то же раз в час в потоке APScheduler
-YandexSpeechKit: перед каждым запросом TokenService.get_token()
+CronScheduler: то же раз в 30 минут (RefreshToken.INTERVAL) в потоке APScheduler
+YandexSpeechKit: перед каждым запросом TokenService.get_token() в asyncio.to_thread;
+                 None → SpeechRecognitionError
+   загрузка аудио в бакет → распознавание → finally: удаление аудио из бакета
 ```

@@ -47,3 +47,5 @@ yandexcloud~=0.344.0
 yookassa==3.5.0
 grpcio~=1.71.0
 APScheduler~=3.11.0
+# pydub на Python 3.13+: audioop удалён из стандартной библиотеки
+audioop-lts~=0.2.1; python_version >= "3.13"

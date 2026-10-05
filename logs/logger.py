@@ -27,7 +27,8 @@ for _handler in logging.getLogger().handlers:
     _handler.setFormatter(ExtraFormatter(log_format))
 logger = logging.getLogger(__name__)
 
-log_dir = os.path.join(os.path.dirname(__file__), "log.log")
+# В контейнере файл лежит в смонтированном каталоге, а не рядом с кодом
+log_dir = os.getenv("LOG_FILE") or os.path.join(os.path.dirname(__file__), "log.log")
 file_handler = RotatingFileHandler(
     log_dir, maxBytes=1000000, backupCount=5, encoding="utf-8"
 )

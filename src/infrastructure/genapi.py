@@ -13,14 +13,17 @@ from src.domain.ports import LanguageModelInterface
 class GenAPIError(LanguageModelError):
     """Ошибка обращения к GenAPI."""
 
-    def __init__(self, message: str, status_code: Optional[int] = None):
+    def __init__(
+        self, message: str, status_code: Optional[int] = None, transient: bool = False
+    ):
         super().__init__(message)
         self.status_code = status_code
+        # Запрос точно не обработан или сервер просит повторить: повтор безопасен
+        self.transient = transient
 
 
-def _is_transient(error: GenAPIError) -> bool:
-    """Сеть, таймаут (status_code нет), перегрузка или сбой сервера."""
-    return error.status_code is None or error.status_code == 429 or error.status_code >= 500
+def _is_transient_status(status_code: int) -> bool:
+    return status_code == 429 or status_code >= 500
 
 
 class GenAPIClient(LanguageModelInterface):
@@ -49,7 +52,7 @@ class GenAPIClient(LanguageModelInterface):
             try:
                 return self._post_once(endpoint, payload)
             except GenAPIError as error:
-                if attempt >= self.settings.max_retries or not _is_transient(error):
+                if attempt >= self.settings.max_retries or not error.transient:
                     raise
                 time.sleep(self.settings.retry_backoff_seconds * 2**attempt)
                 attempt += 1
@@ -67,8 +70,14 @@ class GenAPIClient(LanguageModelInterface):
             error_msg = f"HTTP error: {e.response.status_code}"
             if e.response.text:
                 error_msg += f" - {e.response.text[:500]}"
-            raise GenAPIError(error_msg, e.response.status_code) from e
+            status = e.response.status_code
+            raise GenAPIError(error_msg, status, _is_transient_status(status)) from e
+        except requests.exceptions.ConnectionError as e:
+            # Соединение не установлено (в том числе ConnectTimeout): запрос не ушёл
+            raise GenAPIError(f"Connection failed: {e}", transient=True) from e
         except requests.exceptions.RequestException as e:
+            # ReadTimeout сюда же: модель могла уже ответить и списать у провайдера,
+            # повтор удвоил бы и ожидание, и расход
             raise GenAPIError(f"Request failed: {e}") from e
 
     @staticmethod

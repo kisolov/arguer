@@ -4,10 +4,10 @@ build:
 	docker-compose build $(c)
 
 up:
-	docker-compose up -d $(c)
+	docker-compose up -d --build $(c)
 
 up-dev:
-	docker-compose --profile dev up -d $(c)
+	docker-compose --profile dev up -d --build $(c)
 
 down:
 	docker-compose down $(c)

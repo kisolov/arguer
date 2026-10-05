@@ -70,15 +70,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Код внутри образа; снаружи только логи и ключ Yandex Cloud (только чтение)
     volumes:
-      - ./src:/app/src
-      - ./logs:/app/logs
-      - ./config.py:/app/config.py
-      - ./main.py:/app/main.py
-      - ./.env:/app/.env
-      - ./di.py:/app/di.py
+      - ./logs:/app/var/log
+      - ./yc_config.yaml:/home/app/.config/yandex-cloud/config.yaml:ro
     environment:
       TZ: Europe/Moscow
+      LOG_FILE: /app/var/log/log.log
     networks:
       - bot_network
     restart: unless-stopped

@@ -6,6 +6,8 @@ from ...mocks import MockContextService, MockMessageService, MockPopupService
 
 
 class TestSessionFactory(factory.Factory):
+    __test__ = False  # фабрика, а не набор тестов: pytest не должен её собирать
+
     class Meta:
         model = Session
 

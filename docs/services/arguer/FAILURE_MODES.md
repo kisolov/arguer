@@ -13,22 +13,23 @@
 | Внешняя система | Как ломается | Что происходит | Где |
 |---|---|---|---|
 | **GenAPI** | таймаут (`GENAPI_DEFAULT_TIMEOUT_SECONDS`, 30 с), сетевая ошибка, HTTP 4xx/5xx, поле `error` в теле, неожиданная форма ответа | `GenAPIError` (наследник `LanguageModelError`) → `ProcessArgue` логирует и бросает `UnexpectedError` → см. сценарий А | [genapi.py](../../../src/infrastructure/genapi.py), [process_argue.py](../../../src/application/uc/process_argue.py) |
-| **GenAPI** | повторы | не выполняются: поля `max_retries` и `enable_compression` в [GenAPIConfig](../../../config.py) нигде не читаются | — |
+| **GenAPI** | повторы | ошибка соединения (включая таймаут соединения), HTTP 429 и 5xx повторяются до `GENAPI_MAX_RETRIES` раз (по умолчанию 2) с паузой `GENAPI_RETRY_BACKOFF_SECONDS`·2ⁿ. Таймаут чтения не повторяется: модель могла уже обработать запрос, повтор удвоил бы ожидание и расход у провайдера. 4xx, `error` в теле и неожиданная форма ответа тоже не повторяются | [genapi.py](../../../src/infrastructure/genapi.py) |
 | **YooKassa** `create_payment` | любая ошибка SDK | пополнение, записанное до вызова, отменяется (`CANCELED`); исключение наружу → «Неожиданная ошибка», контекст пользователя сброшен; платежа нет | [send_payment_link.py](../../../src/application/uc/send_payment_link.py) |
 | **YooKassa** `create_payment` успех, дальше падает `attach_payment` (БД) | платёж создан в YooKassa, транзакция осталась `PENDING` без `uuid` | ссылка пользователю **не уходит**, поэтому оплатить нечего: неоплаченный платёж истекает в YooKassa. Обновление баланса транзакции без `uuid` пропускает | там же |
 | **YooKassa** `get_payment_status` | любая ошибка SDK | исключение обрывает `RefreshBalance`: уже применённые в этом проходе транзакции остаются применёнными, остальные — нет; popup «Обновлено» не отправляется; контекст диалога сбрасывается как при любой неожиданной ошибке | [refresh_bal.py](../../../src/application/uc/refresh_bal.py) |
 | **YooKassa** незнакомый статус | — | трактуется как `PENDING`, транзакция ждёт следующего обновления | [yookassa.py](../../../src/infrastructure/yookassa.py) |
 | **Yandex SpeechKit** | любой сбой на шагах загрузки, старта, опроса, разбора | оборачивается в `SpeechRecognitionError("Recognition failed: ...")`, дальше см. сценарий Б | [speechkit.py](../../../src/infrastructure/yandex/s3/speechkit.py) |
 | **Yandex SpeechKit** | нет результата за 300 с (опрос раз в 5 с) | `SpeechRecognitionError("Recognition timeout")`; таймаутов на отдельные HTTP-запросы нет, действуют значения по умолчанию aiohttp | там же |
-| **Yandex Object Storage** | ошибка загрузки | `Exception("Ошибка загрузки байт ...")` → внутри SpeechKit превращается в `SpeechRecognitionError`. Загруженные объекты не удаляются | [bucket.py](../../../src/infrastructure/yandex/s3/bucket.py) |
+| **Yandex Object Storage** | ошибка загрузки | `Exception("Ошибка загрузки байт ...")` → внутри SpeechKit превращается в `SpeechRecognitionError`. Загруженное аудио удаляется после распознавания при любом исходе; ошибка удаления логируется и результат не отменяет | [bucket.py](../../../src/infrastructure/yandex/s3/bucket.py) |
 | **Скачивание файла Telegram** | не 200, сетевая ошибка | `ValueError("Download failed: ...")`, лог `ERROR` | [web.py](../../../src/infrastructure/web.py) |
 | **Расширение файла** | не из списка `mp3/wav/ogg/oga/mp4` | `ValueError("Файлы с расширением ... не поддерживаются")` | там же |
 | **Конвертация mp4** (pydub/ffmpeg) | ошибка декодирования, нет ffmpeg | исключение пробрасывается | там же |
 | **Redis** | недоступен | `redis.ConnectionError` из `get_token`/`save_token`; внутри распознавания речи превращается в `SpeechRecognitionError` | [redis.py](../../../src/infrastructure/redis.py) |
-| **Redis** | токена нет (истёк TTL, не выпускался) | `get_token` вызывает `.decode` у `None` → `AttributeError`; в распознавании речи превращается в `SpeechRecognitionError` | [token_service.py](../../../src/domain/operations/services/token_service.py) |
+| **Redis** | токена нет (истёк TTL, не выпускался) | `get_token` возвращает `None`, SpeechKit бросает `SpeechRecognitionError("IAM-токен Yandex Cloud недоступен")` | [token_service.py](../../../src/domain/operations/services/token_service.py) |
 | **`yc` CLI** | ненулевой код, нет бинаря | `RuntimeError("Failed to create YC IAM token ...")` с командой, stdout и stderr | [cloud_cli.py](../../../src/infrastructure/yandex/cloud_cli.py) |
 | **MySQL** | недоступна, дедлок, таймаут | исключение SQLAlchemy наружу; `pool_pre_ping` пересоздаёт «мёртвые» соединения перед использованием; открытый UnitOfWork откатывается | [unit_of_work.py](../../../src/infrastructure/db/unit_of_work.py) |
-| **Telegram** | ошибка отправки, удаления, правки сообщения | исключение aiogram пробрасывается как неожиданное. Ошибка на `edit_message_text` при совпадении текста тоже | [message_service.py](../../../src/infrastructure/aiogram/message_service.py) |
+| **Telegram** | ошибка отправки, удаления, правки сообщения | исключение aiogram пробрасывается как неожиданное. Ошибка на `edit_message_text` при совпадении текста тоже |
+| **Telegram**, ответ модели | лишние `<`/`&`, неизвестные или несбалансированные теги, длина больше 4096 | не ломают отправку: разрешены только `<b> <i> <u> <s> <code>` без атрибутов, остальное экранируется; при несбалансированных тегах часть уходит без разметки; длинный ответ режется на части по строкам | [message_service.py](../../../src/infrastructure/aiogram/message_service.py) |
 
 ## Сценарии
 
@@ -77,23 +78,24 @@
 |---|---|
 | `create_schema` (БД недоступна) | исключение из `main`, `finally` закрывает engine; процесс завершается |
 | первый выпуск IAM-токена (`yc`, Redis) | исключение из `refresh_token_and_schedule` до polling; процесс завершается |
-| регулярное обновление токена (раз в час) | исключение в потоке APScheduler логируется планировщиком, бот продолжает работать; старый токен живёт `lifetime_in_seconds` = 3600 с, интервал обновления тоже 3600 с, запаса нет — при задержке обновления ключ в Redis успевает истечь |
+| регулярное обновление токена (раз в 30 минут) | исключение в потоке APScheduler логируется планировщиком, бот продолжает работать. Ключ в Redis живёт 3600 с, поэтому одно пропущенное обновление токен не теряет; два подряд — теряет |
 
 ## Блокировка event loop
 
-Вызовы, которые исполняются синхронно в потоке event loop и на время выполнения останавливают все остальные апдейты:
+Синхронные вызовы и где они выполняются:
 
-| Вызов | Где |
+| Вызов | Где выполняется |
 |---|---|
-| весь клиент Redis (`get`/`set`/`delete`/`exists`) | [redis.py](../../../src/infrastructure/redis.py) |
-| конвертация видео pydub/ffmpeg (`async def`, но работа синхронная) | [web.py](../../../src/infrastructure/web.py) `_convert_video_to_audio_bytes` |
-| `subprocess.run` для `yc` | [cloud_cli.py](../../../src/infrastructure/yandex/cloud_cli.py); вызывается из потока планировщика и один раз при старте, поэтому на апдейты не влияет |
+| чтение IAM-токена из Redis (синхронный клиент) при распознавании | `asyncio.to_thread` в [speechkit.py](../../../src/infrastructure/yandex/s3/speechkit.py) `_auth_header` |
+| запись токена в Redis | поток планировщика и старт, до polling |
+| конвертация видео pydub/ffmpeg | `asyncio.to_thread` в [web.py](../../../src/infrastructure/web.py) `_convert_video_sync` |
+| `subprocess.run` для `yc` | [cloud_cli.py](../../../src/infrastructure/yandex/cloud_cli.py): поток планировщика и один раз при старте, на апдейты не влияет |
 
-Вынесены в потоки (`asyncio.to_thread`): GenAPI (`requests`), YooKassa SDK, boto3.
+Тоже в потоках (`asyncio.to_thread`): GenAPI (`requests`, включая паузы между повторами), YooKassa SDK, boto3.
 
 ## Известные несоответствия
 
 | Что | Состояние |
 |---|---|
-| В теле запроса SpeechKit блок `specification` вложен дважды (`config.specification.specification`) — так собирается в [speechkit.py](../../../src/infrastructure/yandex/s3/speechkit.py) | Соответствие реальному API в этой версии не проверялось |
-| Ключ идемпотентности YooKassa генерируется заново на каждый вызов | повтор `create_payment` = второй платёж |
+| Ключ идемпотентности YooKassa генерируется заново на каждый вызов | повтор `create_payment` = второй платёж. Сам бот `create_payment` не повторяет, а ссылка уходит только после записи платежа в БД (сценарий в [DESIGN.md](DESIGN.md) §13) |
+| Форма тела запроса SpeechKit (`config.specification`) сверена с документацией API v2, но не с живым сервисом: тесты подменяют HTTP | до исправления блок был вложен дважды (`config.specification.specification`) |

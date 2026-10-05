@@ -1,0 +1,20 @@
+# Секреты: передаются в контейнер при запуске, в образ и контекст сборки не попадают
+.env
+.env.*
+!.env.example
+yc_config.yaml
+
+# Не нужно для работы бота
+.git
+.github
+.claude
+.venv
+venv
+tests
+docs
+sql
+**/__pycache__
+**/*.pyc
+logs/*.log
+docker-compose*.yaml
+Makefile

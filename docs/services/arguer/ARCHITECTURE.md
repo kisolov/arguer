@@ -40,8 +40,8 @@ Telegram-бот на aiogram 3. Слои: `endpoint → usecase → service → 
 
 | Таблица | Колонки |
 |---|---|
-| `users` | `id` PK, `telegram_id` BIGINT **UNIQUE** (`ix_users_telegram_id`), `bal` DOUBLE (по умолчанию 150.0) |
-| `transactions` | `id` PK, `uuid` VARCHAR(255) NULL, **`user`** FK→`users.id` (колонка так и называется), `status` и `category` VARCHAR(255) со значениями `.value` в нижнем регистре, `amount` DOUBLE, `created_at` DATETIME default `CURRENT_TIMESTAMP` |
+| `users` | `id` PK, `telegram_id` BIGINT **UNIQUE** (`ix_users_telegram_id`), `bal` DECIMAL(14,2) (по умолчанию 150.00) |
+| `transactions` | `id` PK, `uuid` VARCHAR(255) NULL, **`user`** FK→`users.id` (колонка так и называется), `status` и `category` VARCHAR(255) со значениями `.value` в нижнем регистре, `amount` DECIMAL(14,2), `created_at` DATETIME default `CURRENT_TIMESTAMP` |
 
 ## Порты → адаптеры
 
@@ -113,7 +113,7 @@ Telegram-бот на aiogram 3. Слои: `endpoint → usecase → service → 
 
 ## Жизненный цикл процесса
 
-[main.py](../../../main.py): `create_schema()` → первый выпуск IAM-токена (синхронно, до старта) и расписание раз в час → регистрация middleware и роутов → `start_polling`. В `finally` — `database.dispose()`.
+[main.py](../../../main.py): `create_schema()` → первый выпуск IAM-токена (синхронно, до старта) и расписание раз в 30 минут → регистрация middleware и роутов → `start_polling`. В `finally` — `database.dispose()`.
 
 ## Тесты
 

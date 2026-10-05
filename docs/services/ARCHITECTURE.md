@@ -25,10 +25,11 @@
 | Что | Где |
 |---|---|
 | Контейнеры `telegram-bot`, `mysql`, `redis`, `phpmyadmin` (профиль `dev`) | [docker-compose.yaml](../../docker-compose.yaml) |
-| Образ бота: python 3.12, `ffmpeg`, `yc` CLI, точка входа `python main.py` | [docker/bot/Dockerfile](../../docker/bot/Dockerfile) |
+| Образ бота: python 3.12, `ffmpeg` из Debian, `yc` CLI, код внутри образа, пользователь `app`, точка входа `python main.py`. Ключ Yandex Cloud (`yc_config.yaml`) монтируется при запуске только для чтения, в образ не попадает | [docker/bot/Dockerfile](../../docker/bot/Dockerfile), [.dockerignore](../../.dockerignore) |
+| Логи бота: `./logs/log.log` на хосте (в контейнере `LOG_FILE=/app/var/log/log.log`) | [docker-compose.yaml](../../docker-compose.yaml) |
 | Команды `make up`, `up-dev`, `down`, `log` | [Makefile](../../Makefile) |
 | Конфигурация из `.env` (по классу на подсистему, секреты — `SecretStr`) | [config.py](../../config.py) |
-| SQL-миграция для существующей БД (Alembic нет) | [sql/001_users_unique_telegram_id.sql](../../sql/001_users_unique_telegram_id.sql) |
+| SQL-миграции для существующей БД (Alembic нет), применяются вручную по порядку | [sql/001_users_unique_telegram_id.sql](../../sql/001_users_unique_telegram_id.sql), [sql/002_money_decimal.sql](../../sql/002_money_decimal.sql) |
 | CI | [.github/workflows](../../.github/workflows/) |
 
 Процесс один: aiogram long polling. Горизонтальное масштабирование не рассматривалось; что произойдёт при нескольких копиях — в [arguer/INVARIANTS.md](arguer/INVARIANTS.md).

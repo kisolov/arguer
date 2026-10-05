@@ -12,6 +12,8 @@ from tests.test_config import TestSettings
 
 
 class TestContainer(Container):
+    __test__ = False  # контейнер зависимостей, а не набор тестов
+
     # ---- configs ----
     test_config = providers.Singleton(TestSettings)
 

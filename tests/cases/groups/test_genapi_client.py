@@ -84,7 +84,7 @@ class TestGenAPIClient(BaseTestGroup):
         "failure",
         [
             requests.exceptions.ConnectionError("down"),
-            requests.exceptions.Timeout("slow"),
+            requests.exceptions.ConnectTimeout("no route"),
             http_response(status_code=503, text="busy"),
             http_response(status_code=429, text="rate"),
         ],
@@ -105,6 +105,16 @@ class TestGenAPIClient(BaseTestGroup):
             await client.complete([ChatMessage("user", "привет")])
 
         assert client._session.post.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_read_timeout_is_not_retried(self, client):
+        # Модель могла уже обработать запрос: повтор удвоил бы ожидание и расход
+        client._session.post.side_effect = requests.exceptions.ReadTimeout("slow")
+
+        with pytest.raises(GenAPIError):
+            await client.complete([ChatMessage("user", "привет")])
+
+        assert client._session.post.call_count == 1
 
     @pytest.mark.asyncio
     async def test_client_error_is_not_retried(self, client):
